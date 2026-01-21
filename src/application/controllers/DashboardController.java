@@ -64,7 +64,6 @@ public class DashboardController implements Initializable {
     private User currentUser;
     private WorkflowService workflowService;
     private CourrierService courrierService;
-    private DocumentService documentService;
     private MessageService messageService;
     
     // Données
@@ -152,14 +151,6 @@ public class DashboardController implements Initializable {
             } catch (Exception e) {
                 System.err.println("⚠ Erreur CourrierService: " + e.getMessage());
                 courrierService = null;
-            }
-            
-            try {
-                documentService = DocumentService.getInstance();
-                System.out.println("✓ DocumentService initialisé");
-            } catch (Exception e) {
-                System.err.println("⚠ Erreur DocumentService: " + e.getMessage());
-                documentService = null;
             }
             
             try {
@@ -267,28 +258,6 @@ public class DashboardController implements Initializable {
             if (trendCourriers != null) {
                 trendCourriers.setText("↗ +5 aujourd'hui");
                 trendCourriers.setStyle("-fx-text-fill: #27ae60;");
-            }
-            
-            // Documents actifs
-            int documentsActifs = 0;
-            if (documentService != null) {
-                try {
-                    List<Document> documents = documentService.getAllDocuments();
-                    documentsActifs = (int) documents.stream()
-                        .filter(d -> d.getStatut().isActif())
-                        .count();
-                } catch (Exception e) {
-                    System.err.println("⚠ Erreur comptage documents: " + e.getMessage());
-                }
-            }
-            
-            if (statDocumentsActifs != null) {
-                statDocumentsActifs.setText(String.valueOf(documentsActifs));
-            }
-            
-            if (trendDocuments != null) {
-                trendDocuments.setText("↗ +12 cette semaine");
-                trendDocuments.setStyle("-fx-text-fill: #27ae60;");
             }
             
             // Réunions (valeur par défaut pour l'instant)

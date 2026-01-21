@@ -49,15 +49,6 @@
                <Label styleClass="stat-label" text="Courriers en attente" />
             </VBox>
             
-            <!-- Carte Documents actifs -->
-            <VBox alignment="CENTER" spacing="10.0" styleClass="stat-card stat-card-responsive" 
-                  minWidth="200" prefWidth="250" maxWidth="350">
-               <Label style="-fx-font-size: 36px;" text="📄" />
-               <Label fx:id="statDocumentsActifs" styleClass="stat-value" 
-                      style="-fx-text-fill: #3498db;" text="0" />
-               <Label styleClass="stat-label" text="Documents actifs" />
-            </VBox>
-            
             <!-- Carte Réunions -->
             <VBox alignment="CENTER" spacing="10.0" styleClass="stat-card stat-card-responsive" 
                   minWidth="200" prefWidth="250" maxWidth="350">

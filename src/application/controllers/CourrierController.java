@@ -160,12 +160,8 @@ public class CourrierController implements Initializable {
     }
     
     private void setupButtons() {
-        if (btnModifier != null) btnModifier.setOnAction(e -> handleModifier());
-        if (btnSupprimer != null) btnSupprimer.setOnAction(e -> handleSupprimer());
         if (btnMarquerTraite != null) btnMarquerTraite.setOnAction(e -> handleMarquerTraite());
         if (btnCoter != null) btnCoter.setOnAction(e -> handleCoter());
-        if (btnArchiver != null) btnArchiver.setOnAction(e -> handleArchiver());
-        if (btnTransferer != null) btnTransferer.setOnAction(e -> handleTransferer());
         if (btnImprimer != null) btnImprimer.setOnAction(e -> handleImprimer());
     }
     
@@ -184,80 +180,6 @@ public class CourrierController implements Initializable {
             System.err.println("Erreur lors du chargement des courriers: " + e.getMessage());
             AlertUtils.showError("Erreur lors du chargement des courriers");
         }
-    }
-    
-    @FXML
-    private void handleNouveauCourrier() {
-        System.out.println("Action: Nouveau courrier");
-        
-        CourrierFormDialog dialog = new CourrierFormDialog(null);
-        Optional<Courrier> result = dialog.showAndWait();
-        
-        result.ifPresent(courrier -> {
-            // Sauvegarder le courrier
-            boolean saved = courrierService.saveCourrier(courrier);
-            
-            if (saved) {
-                // Si workflow activé, démarrer le workflow
-                if (dialog.isDemarrerWorkflow() && dialog.getServiceDestinataire() != null) {
-                    boolean workflowStarted = workflowService.startWorkflow(
-                        courrier, 
-                        dialog.getServiceDestinataire().getServiceCode()
-                    );
-                    
-                    if (workflowStarted) {
-                        AlertUtils.showInfo("Courrier enregistré et workflow démarré avec succès!");
-                    } else {
-                        AlertUtils.showWarning("Courrier enregistré mais erreur lors du démarrage du workflow");
-                    }
-                } else {
-                    AlertUtils.showInfo("Courrier enregistré avec succès!");
-                }
-                
-                loadCourriers();
-            } else {
-                AlertUtils.showError("Erreur lors de l'enregistrement du courrier");
-            }
-        });
-    }
-    
-    @FXML
-    private void handleCourrierEntrant() {
-        System.out.println("Action: Courrier entrant");
-        
-        CourrierFormDialog dialog = new CourrierFormDialog(null);
-        Optional<Courrier> result = dialog.showAndWait();
-        
-        result.ifPresent(courrier -> {
-            courrier.setTypeCourrier(TypeCourrier.ENTRANT);
-            boolean saved = courrierService.saveCourrier(courrier);
-            
-            if (saved) {
-                if (dialog.isDemarrerWorkflow() && dialog.getServiceDestinataire() != null) {
-                    workflowService.startWorkflow(courrier, dialog.getServiceDestinataire().getServiceCode());
-                }
-                AlertUtils.showInfo("Courrier entrant enregistré avec succès!");
-                loadCourriers();
-            }
-        });
-    }
-    
-    @FXML
-    private void handleCourrierSortant() {
-        System.out.println("Action: Courrier sortant");
-        
-        CourrierFormDialog dialog = new CourrierFormDialog(null);
-        Optional<Courrier> result = dialog.showAndWait();
-        
-        result.ifPresent(courrier -> {
-            courrier.setTypeCourrier(TypeCourrier.SORTANT);
-            boolean saved = courrierService.saveCourrier(courrier);
-            
-            if (saved) {
-                AlertUtils.showInfo("Courrier sortant enregistré avec succès!");
-                loadCourriers();
-            }
-        });
     }
     
     @FXML
@@ -363,50 +285,6 @@ public class CourrierController implements Initializable {
     }
     
     @FXML
-    private void handleModifier() {
-        if (selectedCourrier == null) {
-            AlertUtils.showWarning("Veuillez sélectionner un courrier");
-            return;
-        }
-        
-        CourrierFormDialog dialog = new CourrierFormDialog(selectedCourrier);
-        Optional<Courrier> result = dialog.showAndWait();
-        
-        result.ifPresent(courrier -> {
-            boolean updated = courrierService.updateCourrier(courrier);
-            
-            if (updated) {
-                AlertUtils.showInfo("Courrier modifié avec succès");
-                loadCourriers();
-            } else {
-                AlertUtils.showError("Erreur lors de la modification");
-            }
-        });
-    }
-    
-    @FXML
-    private void handleSupprimer() {
-        if (selectedCourrier == null) {
-            AlertUtils.showWarning("Veuillez sélectionner un courrier");
-            return;
-        }
-        
-        boolean confirm = AlertUtils.showConfirmation(
-            "Confirmation",
-            "Êtes-vous sûr de vouloir supprimer ce courrier ?"
-        );
-        
-        if (confirm) {
-            if (courrierService.deleteCourrier(selectedCourrier.getId())) {
-                AlertUtils.showInfo("Courrier supprimé avec succès");
-                loadCourriers();
-            } else {
-                AlertUtils.showError("Erreur lors de la suppression");
-            }
-        }
-    }
-    
-    @FXML
     private void handleMarquerTraite() {
         if (selectedCourrier == null) {
             AlertUtils.showWarning("Veuillez sélectionner un courrier");
@@ -482,70 +360,7 @@ public class CourrierController implements Initializable {
             }
         });
     }
-    
-    @FXML
-    private void handleArchiver() {
-        if (selectedCourrier == null) {
-            AlertUtils.showWarning("Veuillez sélectionner un courrier");
-            return;
-        }
-        
-        boolean confirm = AlertUtils.showConfirmation(
-            "Confirmation",
-            "Êtes-vous sûr de vouloir archiver ce courrier ?"
-        );
-        
-        if (confirm) {
-            selectedCourrier.setStatut(StatutCourrier.ARCHIVE);
-            selectedCourrier.setWorkflowActif(false);
-            
-            if (courrierService.updateCourrier(selectedCourrier)) {
-                AlertUtils.showInfo("Courrier archivé avec succès");
-                loadCourriers();
-            } else {
-                AlertUtils.showError("Erreur lors de l'archivage");
-            }
-        }
-    }
-    
-    @FXML
-    private void handleTransferer() {
-        if (selectedCourrier == null) {
-            AlertUtils.showWarning("Veuillez sélectionner un courrier");
-            return;
-        }
-        
-        TransfertCourrierDialog dialog = new TransfertCourrierDialog(selectedCourrier);
-        Optional<TransfertInfo> result = dialog.showAndWait();
-        
-        result.ifPresent(transfert -> {
-            // Démarrer le workflow si pas encore actif
-            if (!selectedCourrier.estEnWorkflow()) {
-                workflowService.startWorkflow(
-                    selectedCourrier,
-                    transfert.getServiceDestination().getServiceCode()
-                );
-            }
-            
-            // Transférer le courrier
-            boolean transferred = workflowService.transferCourrier(
-                selectedCourrier,
-                currentUser,
-                transfert.getServiceDestination().getServiceCode(),
-                transfert.getCommentaire(),
-                transfert.getDateEcheance()
-            );
-            
-            if (transferred) {
-                AlertUtils.showInfo("Courrier transféré vers " + 
-                                  transfert.getServiceDestination().getServiceName());
-                loadCourriers();
-            } else {
-                AlertUtils.showError("Erreur lors du transfert");
-            }
-        });
-    }
-    
+      
     @FXML
     private void handleImprimer() {
         if (selectedCourrier == null) {

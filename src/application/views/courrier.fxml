@@ -22,9 +22,6 @@
                </font>
             </Label>
             <Region HBox.hgrow="ALWAYS" />
-            <Button onAction="#handleNouveauCourrier" styleClass="button-success" text="+ Nouveau courrier" />
-            <Button onAction="#handleCourrierEntrant" styleClass="button-primary" text="📥 Courrier entrant" />
-            <Button onAction="#handleCourrierSortant" styleClass="button-secondary" text="📤 Courrier sortant" />
             <Button onAction="#handleActualiser" styleClass="button-info" text="🔄 Actualiser" />
          </HBox>
          
@@ -36,7 +33,6 @@
                     <FXCollections fx:factory="observableArrayList">
                         <String fx:value="Tous" />
                         <String fx:value="Nouveau" />
-                        <String fx:value="En attente" />
                         <String fx:value="En cours" />
                         <String fx:value="Traité" />
                         <String fx:value="Archivé" />
@@ -114,8 +110,6 @@
             <HBox alignment="CENTER_LEFT" spacing="10.0">
                <Label style="-fx-font-weight: bold; -fx-font-size: 16px;" text="Détails du courrier" />
                <Region HBox.hgrow="ALWAYS" />
-               <Button fx:id="btnModifier" styleClass="button-primary" text="✏️" />
-               <Button fx:id="btnSupprimer" styleClass="button-danger" text="🗑️" />
             </HBox>
             
             <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
@@ -175,10 +169,6 @@
                <HBox spacing="8.0">
                   <Button fx:id="btnMarquerTraite" styleClass="button-success" text="✅ Traiter" />
                   <Button fx:id="btnCoter" styleClass="button-warning" text="📌 Coter" />
-               </HBox>
-               <HBox spacing="8.0">
-                  <Button fx:id="btnTransferer" styleClass="button-info" text="➡️ Transférer" />
-                  <Button fx:id="btnArchiver" styleClass="button-secondary" text="📁 Archiver" />
                </HBox>
                <HBox spacing="8.0">
                   <Button fx:id="btnImprimer" styleClass="button-secondary" text="🖨️ Imprimer" />

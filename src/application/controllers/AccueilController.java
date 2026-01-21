@@ -31,7 +31,6 @@ public class AccueilController implements Initializable {
     
     private User currentUser;
     private CourrierService courrierService;
-    private DocumentService documentService;
     private MessageService messageService;
     private MainController mainController;
     
@@ -50,7 +49,6 @@ public class AccueilController implements Initializable {
             
             // Initialisation des services
             courrierService = CourrierService.getInstance();
-            documentService = DocumentService.getInstance();
             messageService = MessageService.getInstance();
             
             // Affichage du message de bienvenue personnalisé
@@ -94,10 +92,6 @@ public class AccueilController implements Initializable {
                 .filter(c -> c.getStatut() == application.models.StatutCourrier.EN_COURS)
                 .count();
             statCourriersEnCours.setText(String.valueOf(courriersEnCours));
-            
-            // Documents
-            int totalDocuments = documentService.getAllDocuments().size();
-            statDocuments.setText(String.valueOf(totalDocuments));
             
             // Messages non lus
             int messagesNonLus = (int) messageService.getMessagesForUser(currentUser.getId()).stream()
@@ -154,14 +148,6 @@ public class AccueilController implements Initializable {
         }
     }
     
-    /**
-     * Gestion de l'action "Nouveau courrier"
-     */
-    @FXML
-    private void handleNouveauCourrier(MouseEvent event) {
-        System.out.println("Action: Nouveau courrier");
-        navigateToView("courrier");
-    }
     
     /**
      * Gestion de l'action "Tableau de bord"
