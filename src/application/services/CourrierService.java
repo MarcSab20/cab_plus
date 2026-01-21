@@ -95,65 +95,6 @@ public class CourrierService {
     }
     
     /**
-     * Enregistre un nouveau courrier
-     */
-    public boolean saveCourrier(Courrier courrier) {
-        String sql = "INSERT INTO courriers (numero_courrier, type_courrier, objet, expediteur, " +
-                     "destinataire, date_reception, date_document, statut, priorite, " +
-                     "workflow_actif, service_actuel, etape_actuelle) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
-        try (Connection conn = DatabaseService.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            
-            stmt.setString(1, courrier.getNumeroCourrier());
-            stmt.setString(2, courrier.getTypeCourrier().toString());
-            stmt.setString(3, courrier.getObjet());
-            stmt.setString(4, courrier.getExpediteur());
-            stmt.setString(5, courrier.getDestinataire());
-            
-            if (courrier.getDateReception() != null) {
-                stmt.setTimestamp(6, Timestamp.valueOf(courrier.getDateReception()));
-            } else {
-                stmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
-            }
-            
-            if (courrier.getDateDocument() != null) {
-                stmt.setTimestamp(7, Timestamp.valueOf(courrier.getDateDocument()));
-            } else {
-                stmt.setNull(7, Types.TIMESTAMP);
-            }
-            
-            stmt.setString(8, courrier.getStatut().toString());
-            stmt.setString(9, courrier.getPriorite());
-            stmt.setBoolean(10, courrier.isWorkflowActif());
-            stmt.setString(11, courrier.getServiceActuel());
-            
-            if (courrier.getEtapeActuelle() != null) {
-                stmt.setInt(12, courrier.getEtapeActuelle());
-            } else {
-                stmt.setNull(12, Types.INTEGER);
-            }
-            
-            int affectedRows = stmt.executeUpdate();
-            
-            if (affectedRows > 0) {
-                try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        courrier.setId(generatedKeys.getInt(1));
-                    }
-                }
-                return true;
-            }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        return false;
-    }
-    
-    /**
      * Met à jour un courrier existant
      */
     public boolean updateCourrier(Courrier courrier) {
@@ -199,25 +140,6 @@ public class CourrierService {
             stmt.setBoolean(13, courrier.isWorkflowTermine());
             stmt.setInt(14, courrier.getId());
             
-            return stmt.executeUpdate() > 0;
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Supprime un courrier
-     */
-    public boolean deleteCourrier(int id) {
-        String sql = "DELETE FROM courriers WHERE id = ?";
-        
-        try (Connection conn = DatabaseService.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, id);
             return stmt.executeUpdate() > 0;
             
         } catch (SQLException e) {
