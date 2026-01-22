@@ -22,11 +22,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
-import application.services.CotationService;
 
 /**
- * Contrôleur amélioré pour la gestion des courriers
- * Avec toutes les fonctionnalités: Enregistrer, Filtrer, Actualiser, Traiter, Archiver, Transférer, Coter, Imprimer
+ * Contrôleur pour la gestion des courriers - VERSION CORRIGÉE
+ * Compatible avec le nouveau modèle Courrier adapté à la vraie DB
  */
 public class CourrierController implements Initializable {
     
@@ -67,6 +66,7 @@ public class CourrierController implements Initializable {
     @FXML private Button btnSupprimer;
     @FXML private Button btnMarquerTraite;
     @FXML private Button btnCoter;
+    @FXML private Button btnCoterSelection;
     @FXML private Button btnArchiver;
     @FXML private Button btnTransferer;
     @FXML private Button btnImprimer;
@@ -74,27 +74,27 @@ public class CourrierController implements Initializable {
     
     private User currentUser;
     private CourrierService courrierService;
-    private WorkflowService workflowService;
+    private CotationService cotationService;
     private ObservableList<Courrier> courriers;
     private Courrier selectedCourrier;
-    private CotationService cotationService;
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        System.out.println("CourrierControllerAmeliore.initialize() appelé");
+        System.out.println("CourrierController.initialize() appelé");
         
         try {
             currentUser = SessionManager.getInstance().getCurrentUser();
             courrierService = CourrierService.getInstance();
-            workflowService = WorkflowService.getInstance();
-            courriers = FXCollections.observableArrayList();
             cotationService = CotationService.getInstance();
-            tableauCourriers.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+            courriers = FXCollections.observableArrayList();
             
             if (currentUser == null) {
                 System.err.println("ERREUR: Aucun utilisateur en session");
                 return;
             }
+            
+            // Activer la sélection multiple
+            tableauCourriers.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
             
             setupTableColumns();
             setupFilters();
@@ -102,38 +102,54 @@ public class CourrierController implements Initializable {
             loadCourriers();
             
         } catch (Exception e) {
-            System.err.println("Erreur dans CourrierControllerAmeliore.initialize(): " + e.getMessage());
+            System.err.println("Erreur dans CourrierController.initialize(): " + e.getMessage());
             e.printStackTrace();
         }
     }
     
     private void setupTableColumns() {
-        colonneNumero.setCellValueFactory(new PropertyValueFactory<>("numeroCourrier"));
+        // CORRECTION: Utiliser codeCourrier au lieu de numeroCourrier
+        colonneNumero.setCellValueFactory(new PropertyValueFactory<>("codeCourrier"));
+        
+        // CORRECTION: Utiliser les nouvelles méthodes du modèle
         colonneType.setCellValueFactory(cellData -> 
             new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getTypeCourrier().getIcone() + " " +
-                cellData.getValue().getTypeCourrier().getLibelle()
+                cellData.getValue().getTypeCourrierIcone() + " " +
+                cellData.getValue().getTypeCourrierLibelle()
             )
         );
+        
         colonneObjet.setCellValueFactory(new PropertyValueFactory<>("objet"));
         colonneExpediteur.setCellValueFactory(new PropertyValueFactory<>("expediteur"));
+        
+        // CORRECTION: dateReception n'existe plus, on utilise dateCourrier
         colonneDate.setCellValueFactory(cellData -> {
-            if (cellData.getValue().getDateReception() != null) {
+            if (cellData.getValue().getDateCourrier() != null) {
+                return new javafx.beans.property.SimpleStringProperty(
+                    cellData.getValue().getDateCourrierFormatee()
+                );
+            }
+            // Fallback sur dateCreation
+            else if (cellData.getValue().getDateCreation() != null) {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
                 return new javafx.beans.property.SimpleStringProperty(
-                    cellData.getValue().getDateReception().format(formatter)
+                    cellData.getValue().getDateCreation().format(formatter)
                 );
             }
             return new javafx.beans.property.SimpleStringProperty("");
         });
+        
         colonnePriorite.setCellValueFactory(cellData -> 
             new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getPrioriteIcone() + " " + cellData.getValue().getPriorite()
+                cellData.getValue().getPrioriteIcone() + " " + 
+                cellData.getValue().getPrioriteLibelle()
             )
         );
+        
         colonneStatut.setCellValueFactory(cellData -> 
             new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getStatutIcone() + " " + cellData.getValue().getStatut().getLibelle()
+                cellData.getValue().getStatutIcone() + " " + 
+                cellData.getValue().getStatutLibelle()
             )
         );
         
@@ -148,14 +164,14 @@ public class CourrierController implements Initializable {
     }
     
     private void setupFilters() {
-        // Initialiser les ComboBox
+        // CORRECTION: Utiliser les valeurs de la vraie DB
         filtreStatut.setItems(FXCollections.observableArrayList(
-            "Tous", "Nouveau", "En attente", "En cours", "Traité", "Archivé"
+            "Tous", "nouveau", "en_cours", "traite", "archive"
         ));
         filtreStatut.setValue("Tous");
         
         filtrePriorite.setItems(FXCollections.observableArrayList(
-            "Toutes", "Urgente", "Haute", "Normale", "Basse"
+            "Toutes", "TRES_URGENTE", "URGENTE", "NORMALE"
         ));
         filtrePriorite.setValue("Toutes");
         
@@ -167,7 +183,9 @@ public class CourrierController implements Initializable {
     private void setupButtons() {
         if (btnMarquerTraite != null) btnMarquerTraite.setOnAction(e -> handleMarquerTraite());
         if (btnCoter != null) btnCoter.setOnAction(e -> handleCoter());
+        if (btnCoterSelection != null) btnCoterSelection.setOnAction(e -> handleCoterSelection());
         if (btnImprimer != null) btnImprimer.setOnAction(e -> handleImprimer());
+        if (btnArchiver != null) btnArchiver.setOnAction(e -> handleArchiver());
     }
     
     private void loadCourriers() {
@@ -207,52 +225,18 @@ public class CourrierController implements Initializable {
             LocalDate debut = dateDebut != null ? dateDebut.getValue() : null;
             LocalDate fin = dateFin != null ? dateFin.getValue() : null;
             
-            List<Courrier> allCourriers = courrierService.getAllCourriers();
-            List<Courrier> filtered = allCourriers.stream()
-                .filter(c -> {
-                    // Filtre statut
-                    if (!statutFilter.equals("Tous")) {
-                        if (!c.getStatut().getLibelle().equals(statutFilter)) {
-                            return false;
-                        }
-                    }
-                    
-                    // Filtre priorité
-                    if (!prioriteFilter.equals("Toutes")) {
-                        if (!c.getPriorite().equalsIgnoreCase(prioriteFilter)) {
-                            return false;
-                        }
-                    }
-                    
-                    // Filtre date
-                    if (debut != null && c.getDateReception() != null) {
-                        if (c.getDateReception().toLocalDate().isBefore(debut)) {
-                            return false;
-                        }
-                    }
-                    
-                    if (fin != null && c.getDateReception() != null) {
-                        if (c.getDateReception().toLocalDate().isAfter(fin)) {
-                            return false;
-                        }
-                    }
-                    
-                    // Recherche textuelle
-                    if (!searchText.isEmpty()) {
-                        boolean textMatch = c.getObjet().toLowerCase().contains(searchText) ||
-                                          (c.getExpediteur() != null && c.getExpediteur().toLowerCase().contains(searchText)) ||
-                                          (c.getNumeroCourrier() != null && c.getNumeroCourrier().toLowerCase().contains(searchText));
-                        if (!textMatch) {
-                            return false;
-                        }
-                    }
-                    
-                    return true;
-                })
-                .collect(Collectors.toList());
+            // CORRECTION: Utiliser le service qui utilise la vraie DB
+            List<Courrier> allCourriers = courrierService.searchCourriers(
+                searchText.isEmpty() ? null : searchText,
+                statutFilter.equals("Tous") ? null : statutFilter,
+                null, // type courrier
+                prioriteFilter.equals("Toutes") ? null : prioriteFilter,
+                debut,
+                fin
+            );
             
             courriers.clear();
-            courriers.addAll(filtered);
+            courriers.addAll(allCourriers);
             
             if (nombreCourriers != null) {
                 nombreCourriers.setText("(" + courriers.size() + " courriers)");
@@ -266,26 +250,48 @@ public class CourrierController implements Initializable {
     private void showCourrierDetails(Courrier courrier) {
         selectedCourrier = courrier;
         
-        if (labelNumero != null) labelNumero.setText(courrier.getNumeroCourrier());
-        if (labelType != null) labelType.setText(courrier.getTypeCourrier().getIcone() + " " + courrier.getTypeCourrier().getLibelle());
+        // CORRECTION: Utiliser codeCourrier
+        if (labelNumero != null) labelNumero.setText(courrier.getCodeCourrier());
+        
+        if (labelType != null) {
+            labelType.setText(
+                courrier.getTypeCourrierIcone() + " " + 
+                courrier.getTypeCourrierLibelle()
+            );
+        }
+        
         if (labelObjet != null) labelObjet.setText(courrier.getObjet());
         if (labelExpediteur != null) labelExpediteur.setText(courrier.getExpediteur());
         
-        if (labelDate != null && courrier.getDateReception() != null) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-            labelDate.setText(courrier.getDateReception().format(formatter));
+        // CORRECTION: Utiliser dateCourrier ou dateCreation
+        if (labelDate != null) {
+            if (courrier.getDateCourrier() != null) {
+                labelDate.setText(courrier.getDateCourrierFormatee());
+            } else if (courrier.getDateCreation() != null) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+                labelDate.setText(courrier.getDateCreation().format(formatter));
+            }
         }
         
         if (labelPriorite != null) {
-            labelPriorite.setText(courrier.getPrioriteIcone() + " " + courrier.getPriorite());
+            labelPriorite.setText(
+                courrier.getPrioriteIcone() + " " + 
+                courrier.getPrioriteLibelle()
+            );
         }
         
         if (labelStatut != null) {
-            labelStatut.setText(courrier.getStatutIcone() + " " + courrier.getStatut().getLibelle());
+            labelStatut.setText(
+                courrier.getStatutIcone() + " " + 
+                courrier.getStatutLibelle()
+            );
         }
         
+        // CORRECTION: Utiliser observations au lieu de notes
         if (textAreaNotes != null) {
-            textAreaNotes.setText(courrier.getNotes() != null ? courrier.getNotes() : "");
+            textAreaNotes.setText(
+                courrier.getObservations() != null ? courrier.getObservations() : ""
+            );
         }
     }
     
@@ -304,13 +310,10 @@ public class CourrierController implements Initializable {
         Optional<String> result = dialog.showAndWait();
         
         result.ifPresent(commentaire -> {
-            selectedCourrier.setStatut(StatutCourrier.TRAITE);
-            selectedCourrier.setDateTraitement(java.time.LocalDateTime.now());
+            // CORRECTION: Utiliser les valeurs String de la vraie DB
+            selectedCourrier.setStatut("traite");
             
-            if (selectedCourrier.estEnWorkflow()) {
-                workflowService.terminerWorkflow(selectedCourrier, currentUser, commentaire);
-            }
-            
+            // Mettre à jour dans la base
             if (courrierService.updateCourrier(selectedCourrier)) {
                 AlertUtils.showInfo("Courrier marqué comme traité");
                 loadCourriers();
@@ -331,37 +334,22 @@ public class CourrierController implements Initializable {
         Optional<CotationInfo> result = dialog.showAndWait();
         
         result.ifPresent(cotation -> {
-            // Créer une étape de workflow pour la cotation
-            String commentaire = "Coté à " + cotation.getUtilisateur().getNomComplet() + "\n" +
-                                cotation.getCommentaire();
+            // Utiliser le nouveau service de cotation
+            boolean success = cotationService.coterCourrier(
+                selectedCourrier,
+                currentUser,
+                cotation.getUtilisateur(),
+                cotation.getCommentaire(),
+                cotation.getPriorite() != null ? cotation.getPriorite() : "NORMALE",
+                cotation.getDelaiJours(),
+                cotation.isNotifierUtilisateur()
+            );
             
-            // Si le courrier n'est pas en workflow, le démarrer
-            if (!selectedCourrier.estEnWorkflow()) {
-                String serviceCode = cotation.getUtilisateur().getServiceCode();
-                if (serviceCode != null) {
-                    workflowService.startWorkflow(selectedCourrier, serviceCode);
-                }
-            }
-            
-            // Transférer vers le service de l'utilisateur
-            String serviceCode = cotation.getUtilisateur().getServiceCode();
-            if (serviceCode != null) {
-                boolean transferred = workflowService.transferCourrier(
-                    selectedCourrier,
-                    currentUser,
-                    serviceCode,
-                    commentaire,
-                    cotation.getDateEcheance()
-                );
-                
-                if (transferred) {
-                    AlertUtils.showInfo("Courrier coté à " + cotation.getUtilisateur().getNomComplet());
-                    loadCourriers();
-                } else {
-                    AlertUtils.showError("Erreur lors de la cotation");
-                }
+            if (success) {
+                AlertUtils.showInfo("Courrier coté à " + cotation.getUtilisateur().getNomComplet());
+                loadCourriers();
             } else {
-                AlertUtils.showWarning("L'utilisateur sélectionné n'a pas de service assigné");
+                AlertUtils.showError("Erreur lors de la cotation");
             }
         });
     }
@@ -388,7 +376,7 @@ public class CourrierController implements Initializable {
                     currentUser, 
                     cotation.getUtilisateur(),
                     cotation.getCommentaire(),
-                    "NORMALE", // ou récupérer de cotation
+                    cotation.getPriorite() != null ? cotation.getPriorite() : "NORMALE",
                     cotation.getDelaiJours(),
                     cotation.isNotifierUtilisateur()
                 );
@@ -398,15 +386,46 @@ public class CourrierController implements Initializable {
                 "Cotation en batch terminée:\n\n" +
                 "Total: %d courriers\n" +
                 "Réussis: %d\n" +
-                "Échecs: %d",
+                "Échecs: %d\n" +
+                "Taux de réussite: %.1f%%",
                 batchResult.getTotalCourriers(),
                 batchResult.getCourriersTraites(),
-                batchResult.getCourrierEchecs()
+                batchResult.getCourrierEchecs(),
+                batchResult.getTauxReussite()
             );
             
-            AlertUtils.showInfo(message);
+            if (batchResult.hasErrors()) {
+                message += "\n\nErreurs:\n" + String.join("\n", batchResult.getErreurs());
+                AlertUtils.showWarning(message);
+            } else {
+                AlertUtils.showInfo(message);
+            }
+            
             loadCourriers();
         });
+    }
+    
+    @FXML
+    private void handleArchiver() {
+        if (selectedCourrier == null) {
+            AlertUtils.showWarning("Veuillez sélectionner un courrier");
+            return;
+        }
+        
+        boolean confirm = AlertUtils.showConfirmation(
+            "Archiver le courrier",
+            "Êtes-vous sûr de vouloir archiver ce courrier ?\n" +
+            "Code: " + selectedCourrier.getCodeCourrier()
+        );
+        
+        if (confirm) {
+            if (courrierService.archiverCourrier(selectedCourrier.getId())) {
+                AlertUtils.showInfo("Courrier archivé avec succès");
+                loadCourriers();
+            } else {
+                AlertUtils.showError("Erreur lors de l'archivage");
+            }
+        }
     }
       
     @FXML
@@ -454,17 +473,17 @@ public class CourrierController implements Initializable {
         titre.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
         content.getChildren().add(titre);
         
-        // Informations
-        content.getChildren().add(new Text("N° Courrier: " + courrier.getNumeroCourrier()));
-        content.getChildren().add(new Text("Type: " + courrier.getTypeCourrier().getLibelle()));
+        // Informations - CORRECTION: Utiliser les bonnes méthodes
+        content.getChildren().add(new Text("N° Courrier: " + courrier.getCodeCourrier()));
+        content.getChildren().add(new Text("Type: " + courrier.getTypeCourrierLibelle()));
         content.getChildren().add(new Text("Objet: " + courrier.getObjet()));
         content.getChildren().add(new Text("Expéditeur: " + courrier.getExpediteur()));
-        content.getChildren().add(new Text("Date: " + courrier.getDateReceptionFormatee()));
-        content.getChildren().add(new Text("Priorité: " + courrier.getPriorite()));
-        content.getChildren().add(new Text("Statut: " + courrier.getStatut().getLibelle()));
+        content.getChildren().add(new Text("Date: " + courrier.getDateCourrierFormatee()));
+        content.getChildren().add(new Text("Priorité: " + courrier.getPrioriteLibelle()));
+        content.getChildren().add(new Text("Statut: " + courrier.getStatutLibelle()));
         
-        if (courrier.getNotes() != null && !courrier.getNotes().isEmpty()) {
-            content.getChildren().add(new Text("\nNotes:\n" + courrier.getNotes()));
+        if (courrier.getObservations() != null && !courrier.getObservations().isEmpty()) {
+            content.getChildren().add(new Text("\nObservations:\n" + courrier.getObservations()));
         }
         
         return content;

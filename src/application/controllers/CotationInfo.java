@@ -12,6 +12,7 @@ public class CotationInfo {
     private LocalDateTime dateEcheance;
     private int delaiJours;
     private boolean notifierUtilisateur;
+    private String priorite;  // NOUVEAU: pour la priorité de la cotation
     
     public User getUtilisateur() {
         return utilisateur;
@@ -51,5 +52,13 @@ public class CotationInfo {
     
     public void setNotifierUtilisateur(boolean notifierUtilisateur) {
         this.notifierUtilisateur = notifierUtilisateur;
+    }
+    
+    public String getPriorite() {
+        return priorite;
+    }
+    
+    public void setPriorite(String priorite) {
+        this.priorite = priorite;
     }
 }

@@ -580,7 +580,7 @@ public class WorkflowSuiviController implements Initializable {
         List<CourrierItem> items = courriers.stream()
             .map(c -> new CourrierItem(
                 c.getId(),
-                c.getNumeroCourrier(),
+                c.getCodeCourrier(),
                 c.getObjet(),
                 c.getTypeCourrier(),
                 c.getDateReception()
@@ -628,7 +628,7 @@ public class WorkflowSuiviController implements Initializable {
             // Mettre à jour les statistiques
             updateStatsForCourrierIndividuel(steps);
             
-            System.out.println("✓ Courrier chargé: " + courrierSelectionne.getNumeroCourrier());
+            System.out.println("✓ Courrier chargé: " + courrierSelectionne.getCodeCourrier());
             
         } catch (Exception e) {
             System.err.println("❌ Erreur chargement courrier: " + e.getMessage());
@@ -642,7 +642,7 @@ public class WorkflowSuiviController implements Initializable {
      */
     private void updateCourrierInfo(Courrier courrier, List<WorkflowStep> steps) {
         if (lblCourrierNumero != null) {
-            lblCourrierNumero.setText("📧 Courrier: " + courrier.getNumeroCourrier());
+            lblCourrierNumero.setText("📧 Courrier: " + courrier.getCodeCourrier());
         }
         
         if (lblCourrierObjet != null) {
@@ -1171,7 +1171,7 @@ public class WorkflowSuiviController implements Initializable {
                     // Enregistrer le flux
                     FluxCourrier flux = new FluxCourrier(
                         courrier.getId(),
-                        courrier.getNumeroCourrier(),
+                        courrier.getCodeCourrier(),
                         typeCourrier,
                         serviceCode,
                         nextStep.getServiceCode(),

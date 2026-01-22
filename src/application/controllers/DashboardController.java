@@ -236,8 +236,8 @@ public class DashboardController implements Initializable {
                 try {
                     List<Courrier> courriers = getCourriersVisibles();
                     enAttente = (int) courriers.stream()
-                        .filter(c -> c.getStatut() == StatutCourrier.EN_ATTENTE)
-                        .count();
+                    	    .filter(c -> c.getStatut().equals("en_cours"))  // String, pas Enum
+                    	    .count();
                 } catch (Exception e) {
                     System.err.println("⚠ Erreur comptage courriers: " + e.getMessage());
                 }
@@ -297,7 +297,7 @@ public class DashboardController implements Initializable {
             
             // Statistiques rapides
             long enCours = courriersEnWorkflow.stream()
-                .filter(c -> c.getStatut() == StatutCourrier.EN_COURS)
+                .filter(c -> c.getStatut().equals("en_cours"))
                 .count();
             
             if (labelCourriersEnCours != null) {
@@ -725,8 +725,8 @@ public class DashboardController implements Initializable {
                         courriersParMois.merge(moisStr, 1, Integer::sum);
                         
                         // Incrémenter le compteur de courriers traités si applicable
-                        if (courrier.getStatut() == StatutCourrier.TRAITE || 
-                            courrier.getStatut() == StatutCourrier.ARCHIVE) {
+                        if (courrier.getStatut().equals("traité") || 
+                            courrier.getStatut().equals("archivé")) {
                             traitesParMois.merge(moisStr, 1, Integer::sum);
                         }
                     }
@@ -786,7 +786,7 @@ public class DashboardController implements Initializable {
             }
             
             // Compter les courriers par statut
-            Map<StatutCourrier, Long> repartitionParStatut = tousLesCourriers.stream()
+            Map<String, Long> repartitionParStatut = tousLesCourriers.stream()
                 .collect(Collectors.groupingBy(Courrier::getStatut, Collectors.counting()));
             
             // Créer les données du PieChart
