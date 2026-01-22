@@ -151,25 +151,8 @@ public class MainController implements Initializable {
             if (btnCourrier != null) {
                 btnCourrier.setOnAction(e -> loadView("courrier"));
             }
-            
-            if (btnDocuments != null) {
-                btnDocuments.setOnAction(e -> loadView("documents"));
-            }
-            
-            if (btnReunions != null) {
-                btnReunions.setOnAction(e -> loadView("reunions"));
-            }
-            
             if (btnMessages != null) {
-                btnMessages.setOnAction(e -> loadView("messages"));
-            }
-            
-            if (btnRecherche != null) {
-                btnRecherche.setOnAction(e -> loadView("recherche"));
-            }
-            
-            if (btnParametres != null) {
-                btnParametres.setOnAction(e -> loadView("parametres"));
+                btnMessages.setOnAction(e -> loadView("messagerie_courrier"));
             }
             
             if (btnWorkflowGraph != null) {

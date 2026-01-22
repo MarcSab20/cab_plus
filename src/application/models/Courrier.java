@@ -1,49 +1,62 @@
 package application.models;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 /**
- * Modèle représentant un courrier dans le système
+ * Modèle représentant un courrier - VERSION ALIGNÉE AVEC LA BASE DE DONNÉES
+ * Correspond à la table 'courriers' de la base de données document
  */
 public class Courrier {
+    // Champs correspondant à la table DB
     private int id;
-    private String numeroCourrier;
-    private TypeCourrier typeCourrier;
+    private String codeCourrier;           // Format: COU-ANNÉE-SÉQUENCE
+    private int documentId;                // Document obligatoire
+    private String typeCourrier;           // ENTRANT, SORTANT, INTERNE
     private String objet;
     private String expediteur;
     private String destinataire;
-    private LocalDateTime dateReception;
-    private LocalDateTime dateDocument;
-    private LocalDateTime dateTraitement;
-    private StatutCourrier statut;
-    private String priorite;
-    private String notes;
-    private boolean workflowActif;
-    private String serviceActuel;
-    private Integer etapeActuelle;
-    private boolean workflowTermine;
+    private String reference;
+    private LocalDate dateCourrier;
+    private String priorite;               // NORMALE, URGENTE, TRES_URGENTE
+    private String observations;
+    private boolean confidentiel;
+    private String statut;                 // nouveau, en_cours, traite, archive
+    private LocalDateTime dateArchivage;
+    private Integer creePar;               // user_id qui a créé le courrier
     private LocalDateTime dateCreation;
+    private LocalDateTime dateModification;
+    
+    // Champs additionnels pour l'affichage et la gestion
+    private String expediteurNom;          // Nom complet de l'expéditeur (si user)
+    private String destinataireNom;        // Nom complet du destinataire (si user)
+    private String createurNom;            // Nom de l'utilisateur créateur
+    private boolean aDesCotations;         // Indicateur si le courrier a des cotations
+    private int nombreCotations;           // Nombre de cotations actives
     
     // Constructeurs
     public Courrier() {
-        this.workflowActif = false;
-        this.workflowTermine = false;
-        this.statut = StatutCourrier.NOUVEAU;
-        this.typeCourrier = TypeCourrier.ENTRANT;
-        this.priorite = "normale";
+        this.confidentiel = false;
+        this.statut = "nouveau";
+        this.priorite = "NORMALE";
         this.dateCreation = LocalDateTime.now();
+        this.aDesCotations = false;
+        this.nombreCotations = 0;
     }
     
-    public Courrier(String numeroCourrier, TypeCourrier typeCourrier, String objet) {
+    public Courrier(String codeCourrier, String typeCourrier, String objet) {
         this();
-        this.numeroCourrier = numeroCourrier;
+        this.codeCourrier = codeCourrier;
         this.typeCourrier = typeCourrier;
         this.objet = objet;
     }
     
+    // ============================================================================
     // Getters et Setters
+    // ============================================================================
+    
     public int getId() {
         return id;
     }
@@ -52,25 +65,28 @@ public class Courrier {
         this.id = id;
     }
     
-    public String getNumeroCourrier() {
-        return numeroCourrier;
+    public String getCodeCourrier() {
+        return codeCourrier;
     }
     
-    public void setNumeroCourrier(String numeroCourrier) {
-        this.numeroCourrier = numeroCourrier;
+    public void setCodeCourrier(String codeCourrier) {
+        this.codeCourrier = codeCourrier;
     }
     
-    public TypeCourrier getTypeCourrier() {
+    public int getDocumentId() {
+        return documentId;
+    }
+    
+    public void setDocumentId(int documentId) {
+        this.documentId = documentId;
+    }
+    
+    public String getTypeCourrier() {
         return typeCourrier;
     }
     
-    public void setTypeCourrier(TypeCourrier typeCourrier) {
+    public void setTypeCourrier(String typeCourrier) {
         this.typeCourrier = typeCourrier;
-    }
-    
-    // Méthode pour compatibilité avec String
-    public void setTypeCourrierFromString(String type) {
-        this.typeCourrier = TypeCourrier.fromString(type);
     }
     
     public String getObjet() {
@@ -97,41 +113,20 @@ public class Courrier {
         this.destinataire = destinataire;
     }
     
-    public LocalDateTime getDateReception() {
-        return dateReception;
+    public String getReference() {
+        return reference;
     }
     
-    public void setDateReception(LocalDateTime dateReception) {
-        this.dateReception = dateReception;
+    public void setReference(String reference) {
+        this.reference = reference;
     }
     
-    public LocalDateTime getDateDocument() {
-        return dateDocument;
+    public LocalDate getDateCourrier() {
+        return dateCourrier;
     }
     
-    public void setDateDocument(LocalDateTime dateDocument) {
-        this.dateDocument = dateDocument;
-    }
-    
-    public LocalDateTime getDateTraitement() {
-        return dateTraitement;
-    }
-    
-    public void setDateTraitement(LocalDateTime dateTraitement) {
-        this.dateTraitement = dateTraitement;
-    }
-    
-    public StatutCourrier getStatut() {
-        return statut;
-    }
-    
-    public void setStatut(StatutCourrier statut) {
-        this.statut = statut;
-    }
-    
-    // Méthode pour compatibilité avec String
-    public void setStatutFromString(String statut) {
-        this.statut = StatutCourrier.fromString(statut);
+    public void setDateCourrier(LocalDate dateCourrier) {
+        this.dateCourrier = dateCourrier;
     }
     
     public String getPriorite() {
@@ -142,44 +137,44 @@ public class Courrier {
         this.priorite = priorite;
     }
     
-    public String getNotes() {
-        return notes;
+    public String getObservations() {
+        return observations;
     }
     
-    public void setNotes(String notes) {
-        this.notes = notes;
+    public void setObservations(String observations) {
+        this.observations = observations;
     }
     
-    public boolean isWorkflowActif() {
-        return workflowActif;
+    public boolean isConfidentiel() {
+        return confidentiel;
     }
     
-    public void setWorkflowActif(boolean workflowActif) {
-        this.workflowActif = workflowActif;
+    public void setConfidentiel(boolean confidentiel) {
+        this.confidentiel = confidentiel;
     }
     
-    public String getServiceActuel() {
-        return serviceActuel;
+    public String getStatut() {
+        return statut;
     }
     
-    public void setServiceActuel(String serviceActuel) {
-        this.serviceActuel = serviceActuel;
+    public void setStatut(String statut) {
+        this.statut = statut;
     }
     
-    public Integer getEtapeActuelle() {
-        return etapeActuelle;
+    public LocalDateTime getDateArchivage() {
+        return dateArchivage;
     }
     
-    public void setEtapeActuelle(Integer etapeActuelle) {
-        this.etapeActuelle = etapeActuelle;
+    public void setDateArchivage(LocalDateTime dateArchivage) {
+        this.dateArchivage = dateArchivage;
     }
     
-    public boolean isWorkflowTermine() {
-        return workflowTermine;
+    public Integer getCreePar() {
+        return creePar;
     }
     
-    public void setWorkflowTermine(boolean workflowTermine) {
-        this.workflowTermine = workflowTermine;
+    public void setCreePar(Integer creePar) {
+        this.creePar = creePar;
     }
     
     public LocalDateTime getDateCreation() {
@@ -190,74 +185,90 @@ public class Courrier {
         this.dateCreation = dateCreation;
     }
     
-    // Méthodes utilitaires
+    public LocalDateTime getDateModification() {
+        return dateModification;
+    }
+    
+    public void setDateModification(LocalDateTime dateModification) {
+        this.dateModification = dateModification;
+    }
+    
+    // Champs additionnels
+    public String getExpediteurNom() {
+        return expediteurNom;
+    }
+    
+    public void setExpediteurNom(String expediteurNom) {
+        this.expediteurNom = expediteurNom;
+    }
+    
+    public String getDestinataireNom() {
+        return destinataireNom;
+    }
+    
+    public void setDestinataireNom(String destinataireNom) {
+        this.destinataireNom = destinataireNom;
+    }
+    
+    public String getCreateurNom() {
+        return createurNom;
+    }
+    
+    public void setCreateurNom(String createurNom) {
+        this.createurNom = createurNom;
+    }
+    
+    public boolean isADesCotations() {
+        return aDesCotations;
+    }
+    
+    public void setADesCotations(boolean aDesCotations) {
+        this.aDesCotations = aDesCotations;
+    }
+    
+    public int getNombreCotations() {
+        return nombreCotations;
+    }
+    
+    public void setNombreCotations(int nombreCotations) {
+        this.nombreCotations = nombreCotations;
+    }
+    
+    // ============================================================================
+    // Méthodes utilitaires pour l'affichage
+    // ============================================================================
     
     /**
-     * Retourne la date de réception formatée
+     * Retourne la date du courrier formatée
      */
-    public String getDateReceptionFormatee() {
-        if (dateReception == null) return "";
+    public String getDateCourrierFormatee() {
+        if (dateCourrier == null) return "";
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        return dateReception.format(formatter);
+        return dateCourrier.format(formatter);
     }
     
     /**
-     * Retourne la date de réception avec heure formatée
+     * Retourne la date de création formatée
      */
-    public String getDateReceptionAvecHeureFormatee() {
-        if (dateReception == null) return "";
+    public String getDateCreationFormatee() {
+        if (dateCreation == null) return "";
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        return dateReception.format(formatter);
-    }
-    
-    /**
-     * Retourne la date du document formatée
-     */
-    public String getDateDocumentFormatee() {
-        if (dateDocument == null) return "";
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        return dateDocument.format(formatter);
-    }
-    
-    /**
-     * Retourne la date de traitement formatée
-     */
-    public String getDateTraitementFormatee() {
-        if (dateTraitement == null) return "";
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        return dateTraitement.format(formatter);
-    }
-    
-    /**
-     * Retourne le libellé du statut
-     */
-    public String getStatutLibelle() {
-        return statut != null ? statut.getLibelle() : "";
-    }
-    
-    /**
-     * Retourne le libellé du type
-     */
-    public String getTypeCourrierLibelle() {
-        return typeCourrier != null ? typeCourrier.getLibelle() : "";
+        return dateCreation.format(formatter);
     }
     
     /**
      * Retourne le libellé de la priorité
      */
     public String getPrioriteLibelle() {
-        if (priorite == null) return "";
+        if (priorite == null) return "Normale";
         
-        switch (priorite.toLowerCase()) {
-            case "haute":
-            case "elevee":
-                return "Haute";
-            case "normale":
+        switch (priorite.toUpperCase()) {
+            case "TRES_URGENTE":
+                return "Très Urgente";
+            case "URGENTE":
+                return "Urgente";
+            case "NORMALE":
                 return "Normale";
-            case "basse":
-                return "Basse";
-            case "urgent":
-                return "Urgent";
             default:
                 return priorite;
         }
@@ -267,18 +278,15 @@ public class Courrier {
      * Retourne l'icône de priorité
      */
     public String getPrioriteIcone() {
-        if (priorite == null) return "⚪";
+        if (priorite == null) return "🟡";
         
-        switch (priorite.toLowerCase()) {
-            case "haute":
-            case "elevee":
-                return "🔴";
-            case "normale":
-                return "🟡";
-            case "basse":
-                return "🟢";
-            case "urgent":
+        switch (priorite.toUpperCase()) {
+            case "TRES_URGENTE":
                 return "🚨";
+            case "URGENTE":
+                return "🔴";
+            case "NORMALE":
+                return "🟡";
             default:
                 return "⚪";
         }
@@ -288,20 +296,57 @@ public class Courrier {
      * Retourne la couleur associée à la priorité
      */
     public String getPrioriteCouleur() {
-        if (priorite == null) return "#9e9e9e";
+        if (priorite == null) return "#f39c12";
         
-        switch (priorite.toLowerCase()) {
-            case "haute":
-            case "elevee":
-                return "#e74c3c";
-            case "normale":
-                return "#f39c12";
-            case "basse":
-                return "#27ae60";
-            case "urgent":
+        switch (priorite.toUpperCase()) {
+            case "TRES_URGENTE":
                 return "#c0392b";
+            case "URGENTE":
+                return "#e74c3c";
+            case "NORMALE":
+                return "#f39c12";
             default:
                 return "#9e9e9e";
+        }
+    }
+    
+    /**
+     * Retourne le libellé du statut
+     */
+    public String getStatutLibelle() {
+        if (statut == null) return "Nouveau";
+        
+        switch (statut.toLowerCase()) {
+            case "nouveau":
+                return "Nouveau";
+            case "en_cours":
+                return "En cours";
+            case "traite":
+                return "Traité";
+            case "archive":
+                return "Archivé";
+            default:
+                return statut;
+        }
+    }
+    
+    /**
+     * Retourne l'icône du statut
+     */
+    public String getStatutIcone() {
+        if (statut == null) return "🆕";
+        
+        switch (statut.toLowerCase()) {
+            case "nouveau":
+                return "🆕";
+            case "en_cours":
+                return "⏳";
+            case "traite":
+                return "✅";
+            case "archive":
+                return "📦";
+            default:
+                return "⚪";
         }
     }
     
@@ -309,64 +354,71 @@ public class Courrier {
      * Retourne la couleur associée au statut
      */
     public String getStatutCouleur() {
-        return statut != null ? statut.getCouleur() : "#9e9e9e";
-    }
-    
-    /**
-     * Retourne l'icône du statut
-     */
-    public String getStatutIcone() {
-        return statut != null ? statut.getIcone() : "⚪";
+        if (statut == null) return "#3498db";
+        
+        switch (statut.toLowerCase()) {
+            case "nouveau":
+                return "#3498db";
+            case "en_cours":
+                return "#f39c12";
+            case "traite":
+                return "#27ae60";
+            case "archive":
+                return "#95a5a6";
+            default:
+                return "#9e9e9e";
+        }
     }
     
     /**
      * Retourne l'icône du type de courrier
      */
-    public String getIcone() {
-        return typeCourrier != null ? typeCourrier.getIcone() : "📧";
+    public String getTypeCourrierIcone() {
+        if (typeCourrier == null) return "📧";
+        
+        switch (typeCourrier.toUpperCase()) {
+            case "ENTRANT":
+                return "📥";
+            case "SORTANT":
+                return "📤";
+            case "INTERNE":
+                return "🔄";
+            default:
+                return "📧";
+        }
     }
     
     /**
      * Retourne le libellé du type
      */
-    public String getLibelle() {
-        return typeCourrier != null ? typeCourrier.getLibelle() : "";
+    public String getTypeCourrierLibelle() {
+        if (typeCourrier == null) return "Courrier";
+        
+        switch (typeCourrier.toUpperCase()) {
+            case "ENTRANT":
+                return "Entrant";
+            case "SORTANT":
+                return "Sortant";
+            case "INTERNE":
+                return "Interne";
+            default:
+                return typeCourrier;
+        }
     }
     
     /**
-     * Vérifie si le courrier est en workflow
+     * Vérifie si le courrier peut être coté
      */
-    public boolean estEnWorkflow() {
-        return workflowActif && !workflowTermine;
+    public boolean peutEtreCote() {
+        return statut != null && !statut.equalsIgnoreCase("archive");
     }
     
     /**
-     * Vérifie si le courrier est en retard
+     * Vérifie si le courrier peut être traité
      */
-    public boolean isEnRetard() {
-        // À implémenter selon les règles métier
-        // Par exemple, vérifier si une échéance est dépassée
-        return false;
-    }
-    
-    /**
-     * Active le workflow pour ce courrier
-     */
-    public void activerWorkflow(String serviceInitial) {
-        this.workflowActif = true;
-        this.serviceActuel = serviceInitial;
-        this.etapeActuelle = 1;
-        this.statut = StatutCourrier.EN_COURS;
-    }
-    
-    /**
-     * Termine le workflow
-     */
-    public void terminerWorkflow() {
-        this.workflowActif = false;
-        this.workflowTermine = true;
-        this.statut = StatutCourrier.TRAITE;
-        this.dateTraitement = LocalDateTime.now();
+    public boolean peutEtreTraite() {
+        return statut != null && 
+               (statut.equalsIgnoreCase("nouveau") || statut.equalsIgnoreCase("en_cours"));
     }
     
     /**
@@ -374,14 +426,32 @@ public class Courrier {
      */
     public String getResume() {
         StringBuilder resume = new StringBuilder();
-        resume.append(numeroCourrier).append(" - ");
+        resume.append(codeCourrier).append(" - ");
         resume.append(objet);
         
-        if (priorite != null && (priorite.equalsIgnoreCase("haute") || priorite.equalsIgnoreCase("urgent"))) {
+        if (priorite != null && (priorite.equalsIgnoreCase("URGENTE") || priorite.equalsIgnoreCase("TRES_URGENTE"))) {
             resume.append(" [").append(getPrioriteLibelle()).append("]");
         }
         
+        if (confidentiel) {
+            resume.append(" [CONFIDENTIEL]");
+        }
+        
         return resume.toString();
+    }
+    
+    /**
+     * Retourne le nom d'affichage de l'expéditeur
+     */
+    public String getExpediteurAffichage() {
+        return expediteurNom != null ? expediteurNom : expediteur;
+    }
+    
+    /**
+     * Retourne le nom d'affichage du destinataire
+     */
+    public String getDestinataireAffichage() {
+        return destinataireNom != null ? destinataireNom : destinataire;
     }
     
     @Override
@@ -401,12 +471,11 @@ public class Courrier {
     public String toString() {
         return "Courrier{" +
                 "id=" + id +
-                ", numero='" + numeroCourrier + '\'' +
+                ", code='" + codeCourrier + '\'' +
                 ", objet='" + objet + '\'' +
                 ", statut='" + statut + '\'' +
                 ", priorite='" + priorite + '\'' +
-                ", workflowActif=" + workflowActif +
-                ", serviceActuel='" + serviceActuel + '\'' +
+                ", cotations=" + nombreCotations +
                 '}';
     }
 }

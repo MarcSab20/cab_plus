@@ -116,23 +116,12 @@
                   </font>
                </Button>
                
-               <Button fx:id="btnReunions" alignment="BASELINE_LEFT" maxWidth="1.7976931348623157E308" styleClass="sidebar-button" text="👥 Réunions">
-                  <padding>
-                     <Insets bottom="15.0" left="25.0" right="25.0" top="15.0" />
-                  </padding>
-                  <font>
-                     <Font size="14.0" />
-                  </font>
-               </Button>
-               
-               <Button fx:id="btnMessages" alignment="BASELINE_LEFT" maxWidth="1.7976931348623157E308" styleClass="sidebar-button" text="💬 Messages">
-                  <padding>
-                     <Insets bottom="15.0" left="25.0" right="25.0" top="15.0" />
-                  </padding>
-                  <font>
-                     <Font size="14.0" />
-                  </font>
-               </Button>
+               <Button fx:id="btnMessages" alignment="BASELINE_LEFT" maxWidth="1.7976931348623157E308" 
+				        styleClass="sidebar-button" text="📬 Mes Courriers">
+				   <padding>
+				      <Insets bottom="15.0" left="25.0" right="25.0" top="15.0" />
+				   </padding>
+				</Button>
                
                <!-- Séparateur (conditionnel pour admin) -->
                <Separator fx:id="adminSeparator" style="-fx-background-color: rgba(255,255,255,0.1); -fx-padding: 10 20;" />

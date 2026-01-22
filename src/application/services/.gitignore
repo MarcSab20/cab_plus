@@ -18,3 +18,5 @@
 /UserService.class
 /WorkflowService.class
 /NotificationCourrierService.class
+/CotationService.class
+/CotationService$BatchOperationResult.class

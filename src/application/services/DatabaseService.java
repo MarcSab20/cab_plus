@@ -422,57 +422,6 @@ public class DatabaseService {
     // ==================== MÉTHODES WORKFLOW (NOUVELLES) ====================
     
     /**
-     * Mappe un ResultSet vers un objet Courrier
-     * Méthode PUBLIQUE et STATIQUE pour être accessible depuis WorkflowService
-     */
-    public static Courrier mapResultSetToCourrier(ResultSet rs) throws SQLException {
-        Courrier courrier = new Courrier();
-        
-        courrier.setId(rs.getInt("id"));
-        courrier.setNumeroCourrier(rs.getString("numero_courrier"));
-        
-        // Type courrier avec gestion String/Enum
-        String typeStr = rs.getString("type_courrier");
-        courrier.setTypeCourrierFromString(typeStr);
-        
-        courrier.setObjet(rs.getString("objet"));
-        courrier.setExpediteur(rs.getString("expediteur"));
-        courrier.setDestinataire(rs.getString("destinataire"));
-        
-        Timestamp dateReception = rs.getTimestamp("date_reception");
-        if (dateReception != null) {
-            courrier.setDateReception(dateReception.toLocalDateTime());
-        }
-        
-        Timestamp dateDocument = rs.getTimestamp("date_document");
-        if (dateDocument != null) {
-            courrier.setDateDocument(dateDocument.toLocalDateTime());
-        }
-        
-        // Statut avec gestion String/Enum
-        String statutStr = rs.getString("statut");
-        courrier.setStatutFromString(statutStr);
-        
-        courrier.setPriorite(rs.getString("priorite"));
-        courrier.setWorkflowActif(rs.getBoolean("workflow_actif"));
-        courrier.setServiceActuel(rs.getString("service_actuel"));
-        
-        int etapeActuelle = rs.getInt("etape_actuelle");
-        if (!rs.wasNull()) {
-            courrier.setEtapeActuelle(etapeActuelle);
-        }
-        
-        courrier.setWorkflowTermine(rs.getBoolean("workflow_termine"));
-        
-        Timestamp dateCreation = rs.getTimestamp("date_creation");
-        if (dateCreation != null) {
-            courrier.setDateCreation(dateCreation.toLocalDateTime());
-        }
-        
-        return courrier;
-    }
-    
-    /**
      * Mappe un ResultSet vers un objet WorkflowStep
      */
     public static WorkflowStep mapResultSetToWorkflowStep(ResultSet rs) throws SQLException {

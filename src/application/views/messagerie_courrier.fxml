@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="application.controllers.MessagerieCourrierController">
+   
+   <!-- Barre d'outils supérieure -->
+   <top>
+      <VBox spacing="15.0" style="-fx-padding: 20; -fx-background-color: white;">
+         
+         <!-- En-tête -->
+         <HBox alignment="CENTER_LEFT" spacing="20.0">
+            <Label style="-fx-text-fill: #2c3e50; -fx-font-weight: bold;" text="📬 Mes Courriers Assignés">
+               <font>
+                  <Font size="24.0" />
+               </font>
+            </Label>
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="labelNombreEnRetard" style="-fx-font-size: 14px;" text="0 en retard" />
+            <Button fx:id="btnActualiser" styleClass="button-info" text="🔄 Actualiser" />
+         </HBox>
+         
+         <!-- Filtres -->
+         <HBox alignment="CENTER_LEFT" spacing="15.0">
+            <Label text="Filtrer par:" />
+            <ComboBox fx:id="filtreStatutCotation" prefWidth="120.0" promptText="Statut" />
+            <CheckBox fx:id="filtreEnRetard" text="En retard uniquement" />
+            
+            <Region HBox.hgrow="ALWAYS" />
+            
+            <TextField fx:id="champRecherche" prefWidth="250.0" promptText="🔍 Rechercher..." />
+            <Button onAction="#handleRecherche" styleClass="button-primary" text="Rechercher" />
+         </HBox>
+         
+      </VBox>
+   </top>
+   
+   <!-- Zone principale -->
+   <center>
+      <SplitPane dividerPositions="0.6" orientation="HORIZONTAL">
+         
+         <!-- Tableau des cotations -->
+         <VBox spacing="10.0" style="-fx-padding: 20;">
+            
+            <!-- En-tête du tableau -->
+            <HBox alignment="CENTER_LEFT" spacing="10.0">
+               <Label style="-fx-font-weight: bold;" text="Mes cotations" />
+               <Label fx:id="labelNombreCotations" style="-fx-text-fill: #7f8c8d;" text="(0 cotations)" />
+               <Region HBox.hgrow="ALWAYS" />
+               <Label fx:id="labelNombreSelection" style="-fx-text-fill: #3498db;" text="0 sélectionné(s)" />
+            </HBox>
+            
+            <!-- TableView -->
+            <TableView fx:id="tableauCotations" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colonneCode" prefWidth="100.0" text="Code" />
+                  <TableColumn fx:id="colonneObjet" prefWidth="200.0" text="Objet" />
+                  <TableColumn fx:id="colonnePriorite" prefWidth="100.0" text="Priorité" />
+                  <TableColumn fx:id="colonneStatut" prefWidth="100.0" text="Statut" />
+                  <TableColumn fx:id="colonneEcheance" prefWidth="100.0" text="Échéance" />
+                  <TableColumn fx:id="colonneDelai" prefWidth="120.0" text="Délai" />
+                  <TableColumn fx:id="colonneCotePar" prefWidth="120.0" text="Coté par" />
+               </columns>
+               
+               <placeholder>
+                  <VBox alignment="CENTER" spacing="10.0">
+                     <Label style="-fx-font-size: 48px; -fx-text-fill: #bdc3c7;" text="📬" />
+                     <Label style="-fx-text-fill: #7f8c8d;" text="Aucune cotation trouvée" />
+                  </VBox>
+               </placeholder>
+            </TableView>
+            
+         </VBox>
+         
+         <!-- Panneau de détails -->
+         <VBox spacing="15.0" style="-fx-padding: 20; -fx-background-color: #f8f9fa;">
+            
+            <Label style="-fx-font-weight: bold; -fx-font-size: 16px;" text="Détails de la cotation" />
+            
+            <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+               <VBox fx:id="panneauDetails" spacing="15.0">
+                  
+                  <!-- Informations du courrier -->
+                  <VBox spacing="10.0" styleClass="card">
+                     <Label style="-fx-font-weight: bold;" text="Informations du courrier" />
+                     
+                     <GridPane hgap="10.0" vgap="8.0">
+                        <columnConstraints>
+                           <ColumnConstraints hgrow="NEVER" minWidth="100.0" />
+                           <ColumnConstraints hgrow="ALWAYS" />
+                        </columnConstraints>
+                        
+                        <Label text="Code:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                        <Label fx:id="labelCodeCourrier" style="-fx-font-weight: bold;" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                        
+                        <Label text="Objet:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                        <Label fx:id="labelObjetCourrier" text="--" wrapText="true"
+                               GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        
+                        <Label text="Expéditeur:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                        <Label fx:id="labelExpediteur" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                     </GridPane>
+                  </VBox>
+                  
+                  <!-- Informations de la cotation -->
+                  <VBox spacing="10.0" styleClass="card">
+                     <Label style="-fx-font-weight: bold;" text="Détails de l'assignation" />
+                     
+                     <GridPane hgap="10.0" vgap="8.0">
+                        <columnConstraints>
+                           <ColumnConstraints hgrow="NEVER" minWidth="100.0" />
+                           <ColumnConstraints hgrow="ALWAYS" />
+                        </columnConstraints>
+                        
+                        <Label text="Statut:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                        <Label fx:id="labelStatutCotation" style="-fx-font-weight: bold;" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                        
+                        <Label text="Échéance:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                        <Label fx:id="labelEcheance" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        
+                        <Label text="Délai:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                        <Label fx:id="labelDelai" style="-fx-font-weight: bold;" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                        
+                        <Label text="Coté par:" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                        <Label fx:id="labelCotePar" text="--" 
+                               GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                     </GridPane>
+                  </VBox>
+                  
+                  <!-- Instructions -->
+                  <VBox spacing="10.0" styleClass="card">
+                     <Label style="-fx-font-weight: bold;" text="Instructions" />
+                     <TextArea fx:id="textAreaInstructions" prefRowCount="3" editable="false"
+                              promptText="Aucune instruction" wrapText="true" />
+                  </VBox>
+                  
+                  <!-- Commentaire de traitement -->
+                  <VBox spacing="10.0" styleClass="card">
+                     <Label style="-fx-font-weight: bold;" text="Commentaire de traitement" />
+                     <TextArea fx:id="textAreaCommentaireTraitement" prefRowCount="3" editable="false"
+                              promptText="Pas encore traité" wrapText="true" />
+                  </VBox>
+                  
+               </VBox>
+            </ScrollPane>
+            
+            <!-- Actions -->
+            <VBox spacing="8.0">
+               <Label style="-fx-font-weight: bold;" text="Actions" />
+               <Button fx:id="btnPrendreEnCharge" styleClass="button-warning" text="✋ Prendre en charge" />
+               <Button fx:id="btnMarquerTraite" styleClass="button-success" text="✅ Marquer traité" />
+               <Separator />
+               <Button fx:id="btnTraiterSelection" styleClass="button-primary" text="✅ Traiter la sélection" />
+            </VBox>
+            
+         </VBox>
+         
+      </SplitPane>
+   </center>
+   
+</BorderPane>

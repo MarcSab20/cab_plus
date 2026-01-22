@@ -64,7 +64,6 @@ public class DashboardController implements Initializable {
     private User currentUser;
     private WorkflowService workflowService;
     private CourrierService courrierService;
-    private MessageService messageService;
     
     // Données
     private ServiceHierarchy userService;
@@ -153,13 +152,6 @@ public class DashboardController implements Initializable {
                 courrierService = null;
             }
             
-            try {
-                messageService = MessageService.getInstance();
-                System.out.println("✓ MessageService initialisé");
-            } catch (Exception e) {
-                System.err.println("⚠ Erreur MessageService: " + e.getMessage());
-                messageService = null;
-            }
             
             // Charger le service de l'utilisateur
             if (workflowService != null && currentUser.getServiceCode() != null) {
@@ -263,23 +255,6 @@ public class DashboardController implements Initializable {
             // Réunions (valeur par défaut pour l'instant)
             if (statReunionsMois != null) {
                 statReunionsMois.setText("0");
-            }
-            
-            // Messages non lus
-            int nonLus = 0;
-            if (messageService != null && currentUser != null) {
-                try {
-                    List<Message> messages = messageService.getMessagesForUser(currentUser.getId());
-                    nonLus = (int) messages.stream()
-                        .filter(m -> !m.isLu())
-                        .count();
-                } catch (Exception e) {
-                    System.err.println("⚠ Erreur comptage messages: " + e.getMessage());
-                }
-            }
-            
-            if (statMessagesNonLus != null) {
-                statMessagesNonLus.setText(String.valueOf(nonLus));
             }
             
             System.out.println("✓ Statistiques chargées");
@@ -401,7 +376,7 @@ public class DashboardController implements Initializable {
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
         
-        Label numeroLabel = new Label(courrier.getNumeroCourrier());
+        Label numeroLabel = new Label(courrier.getCodeCourrier());
         numeroLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
         
         Label objetLabel = new Label(courrier.getObjet());

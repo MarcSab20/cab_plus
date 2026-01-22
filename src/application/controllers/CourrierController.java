@@ -17,10 +17,12 @@ import application.utils.*;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
+import application.services.CotationService;
 
 /**
  * Contrôleur amélioré pour la gestion des courriers
@@ -75,6 +77,7 @@ public class CourrierController implements Initializable {
     private WorkflowService workflowService;
     private ObservableList<Courrier> courriers;
     private Courrier selectedCourrier;
+    private CotationService cotationService;
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -85,6 +88,8 @@ public class CourrierController implements Initializable {
             courrierService = CourrierService.getInstance();
             workflowService = WorkflowService.getInstance();
             courriers = FXCollections.observableArrayList();
+            cotationService = CotationService.getInstance();
+            tableauCourriers.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
             
             if (currentUser == null) {
                 System.err.println("ERREUR: Aucun utilisateur en session");
@@ -358,6 +363,49 @@ public class CourrierController implements Initializable {
             } else {
                 AlertUtils.showWarning("L'utilisateur sélectionné n'a pas de service assigné");
             }
+        });
+    }
+    
+    @FXML
+    private void handleCoterSelection() {
+        ObservableList<Courrier> selection = 
+            tableauCourriers.getSelectionModel().getSelectedItems();
+        
+        if (selection.isEmpty()) {
+            AlertUtils.showWarning("Veuillez sélectionner au moins un courrier");
+            return;
+        }
+        
+        // Dialogue pour les paramètres de cotation batch
+        CoterCourrierDialog dialog = new CoterCourrierDialog(selection.get(0));
+        Optional<CotationInfo> result = dialog.showAndWait();
+        
+        result.ifPresent(cotation -> {
+            List<Courrier> courriers = new ArrayList<>(selection);
+            CotationService.BatchOperationResult batchResult = 
+                cotationService.coterCourriersEnBatch(
+                    courriers, 
+                    currentUser, 
+                    cotation.getUtilisateur(),
+                    cotation.getCommentaire(),
+                    "NORMALE", // ou récupérer de cotation
+                    cotation.getDelaiJours(),
+                    cotation.isNotifierUtilisateur()
+                );
+            
+            // Afficher le résultat
+            String message = String.format(
+                "Cotation en batch terminée:\n\n" +
+                "Total: %d courriers\n" +
+                "Réussis: %d\n" +
+                "Échecs: %d",
+                batchResult.getTotalCourriers(),
+                batchResult.getCourriersTraites(),
+                batchResult.getCourrierEchecs()
+            );
+            
+            AlertUtils.showInfo(message);
+            loadCourriers();
         });
     }
       

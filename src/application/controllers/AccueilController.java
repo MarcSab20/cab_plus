@@ -31,7 +31,6 @@ public class AccueilController implements Initializable {
     
     private User currentUser;
     private CourrierService courrierService;
-    private MessageService messageService;
     private MainController mainController;
     
     @Override
@@ -49,7 +48,6 @@ public class AccueilController implements Initializable {
             
             // Initialisation des services
             courrierService = CourrierService.getInstance();
-            messageService = MessageService.getInstance();
             
             // Affichage du message de bienvenue personnalisé
             labelBienvenue.setText("Bienvenue, " + currentUser.getPrenom() + " " + currentUser.getNom());
@@ -86,18 +84,6 @@ public class AccueilController implements Initializable {
             // Courriers actifs
             int totalCourriers = courrierService.getAllCourriers().size();
             statCourriersTotal.setText(String.valueOf(totalCourriers));
-            
-            // Courriers en cours
-            int courriersEnCours = (int) courrierService.getAllCourriers().stream()
-                .filter(c -> c.getStatut() == application.models.StatutCourrier.EN_COURS)
-                .count();
-            statCourriersEnCours.setText(String.valueOf(courriersEnCours));
-            
-            // Messages non lus
-            int messagesNonLus = (int) messageService.getMessagesForUser(currentUser.getId()).stream()
-                .filter(m -> !m.isLu())
-                .count();
-            statMessages.setText(String.valueOf(messagesNonLus));
             
         } catch (Exception e) {
             System.err.println("Erreur lors du chargement des statistiques: " + e.getMessage());

@@ -41,7 +41,7 @@ public class CoterCourrierDialog extends Dialog<CotationInfo> {
         
         // Configuration du dialogue
         setTitle("Coter un courrier");
-        setHeaderText("Coter le courrier N° " + courrier.getNumeroCourrier() + 
+        setHeaderText("Coter le courrier N° " + courrier.getCodeCourrier() + 
                      "\nà un utilisateur pour traitement");
         initModality(Modality.APPLICATION_MODAL);
         
