@@ -148,9 +148,6 @@ public class MainController implements Initializable {
                 btnWorkflowDashboard.setOnAction(e -> loadView("workflow_suivi")); // Utilise le même dashboard
             }
             
-            if (btnCourrier != null) {
-                btnCourrier.setOnAction(e -> loadView("courrier"));
-            }
             if (btnMessages != null) {
                 btnMessages.setOnAction(e -> loadView("messagerie_courrier"));
             }

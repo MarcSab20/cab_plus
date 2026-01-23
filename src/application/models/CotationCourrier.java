@@ -35,6 +35,8 @@ public class CotationCourrier {
     private String serviceName;             // Nom complet du service
     private String prioriteCourrier;        // Priorité du courrier lui-même
     private String statutCourrier;          // Statut du courrier lui-même
+    private String typeCourrier;            // Type du courrier (ENTRANT, SORTANT, INTERNE)
+    private String expediteurCourrier;      // Expéditeur du courrier
     
     // Constructeurs
     public CotationCourrier() {
@@ -507,6 +509,64 @@ public class CotationCourrier {
         }
         
         return resume.toString();
+    }
+    
+    /**
+     * Type du courrier
+     */
+    public String getTypeCourrier() {
+        return typeCourrier;
+    }
+
+    public void setTypeCourrier(String typeCourrier) {
+        this.typeCourrier = typeCourrier;
+    }
+
+    /**
+     * Expéditeur du courrier
+     */
+    public String getExpediteurCourrier() {
+        return expediteurCourrier;
+    }
+
+    public void setExpediteurCourrier(String expediteurCourrier) {
+        this.expediteurCourrier = expediteurCourrier;
+    }
+
+    /**
+     * Retourne le libellé du type de courrier
+     */
+    public String getTypeCourrierLibelle() {
+        if (typeCourrier == null) return "Courrier";
+        
+        switch (typeCourrier.toUpperCase()) {
+            case "ENTRANT":
+                return "Entrant";
+            case "SORTANT":
+                return "Sortant";
+            case "INTERNE":
+                return "Interne";
+            default:
+                return typeCourrier;
+        }
+    }
+
+    /**
+     * Retourne l'icône du type de courrier
+     */
+    public String getTypeCourrierIcone() {
+        if (typeCourrier == null) return "📧";
+        
+        switch (typeCourrier.toUpperCase()) {
+            case "ENTRANT":
+                return "📥";
+            case "SORTANT":
+                return "📤";
+            case "INTERNE":
+                return "🔄";
+            default:
+                return "📧";
+        }
     }
     
     @Override

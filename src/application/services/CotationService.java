@@ -27,61 +27,6 @@ public class CotationService {
     }
     
     // ============================================================================
-    // COTATION INDIVIDUELLE
-    // ============================================================================
-    
-    /**
-     * Cote un courrier à un utilisateur
-     */
-    public boolean coterCourrier(Courrier courrier, User cotePar, User coteA, 
-                                 String commentaire, String priorite, int delaiJours, 
-                                 boolean notifier) {
-        
-        String sql = """
-            INSERT INTO cotations_courriers 
-            (courrier_id, cote_par, cote_a, service_destination, commentaire, 
-             priorite, date_echeance, delai_jours, statut, notifier_utilisateur)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?)
-        """;
-        
-        try (Connection conn = DatabaseService.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            
-            LocalDateTime dateEcheance = LocalDateTime.now().plusDays(delaiJours);
-            
-            stmt.setInt(1, courrier.getId());
-            stmt.setInt(2, cotePar.getId());
-            stmt.setInt(3, coteA.getId());
-            stmt.setString(4, coteA.getServiceCode());
-            stmt.setString(5, commentaire);
-            stmt.setString(6, priorite);
-            stmt.setTimestamp(7, Timestamp.valueOf(dateEcheance));
-            stmt.setInt(8, delaiJours);
-            stmt.setBoolean(9, notifier);
-            
-            int rowsAffected = stmt.executeUpdate();
-            
-            if (rowsAffected > 0) {
-                // Mettre à jour le statut du courrier
-                updateCourrierStatut(courrier.getId(), "en_cours");
-                
-                // Enregistrer dans l'historique
-                enregistrerHistorique(courrier.getId(), cotePar.getId(), "cotation",
-                    "Courrier coté à " + coteA.getNomComplet());
-                
-                System.out.println("✓ Cotation créée avec succès");
-                return true;
-            }
-            
-        } catch (SQLException e) {
-            System.err.println("Erreur lors de la cotation: " + e.getMessage());
-            e.printStackTrace();
-        }
-        
-        return false;
-    }
-    
-    // ============================================================================
     // COTATION EN BATCH
     // ============================================================================
     
@@ -247,10 +192,16 @@ public class CotationService {
     public List<CotationCourrier> getCotationsAssigneesA(int userId) {
         List<CotationCourrier> cotations = new ArrayList<>();
         
+        // REQUÊTE SQL CORRIGÉE:
         String sql = """
             SELECT 
                 cot.*,
-                c.code_courrier, c.objet as courrier_objet, c.priorite as priorite_courrier, c.statut as statut_courrier,
+                c.code_courrier, 
+                c.objet as courrier_objet, 
+                c.type_courrier,
+                c.expediteur,
+                c.priorite as priorite_courrier, 
+                c.statut as statut_courrier,
                 CONCAT(u_coteur.prenom, ' ', u_coteur.nom) as coteur_nom,
                 CONCAT(u_assigne.prenom, ' ', u_assigne.nom) as assigne_nom,
                 sh.service_name
@@ -284,6 +235,7 @@ public class CotationService {
         
         return cotations;
     }
+
     
     /**
      * Récupère les cotations par statut
@@ -307,10 +259,16 @@ public class CotationService {
      * Récupère une cotation par ID
      */
     public CotationCourrier getCotationById(int cotationId) {
+        // REQUÊTE SQL CORRIGÉE:
         String sql = """
             SELECT 
                 cot.*,
-                c.code_courrier, c.objet as courrier_objet, c.priorite as priorite_courrier, c.statut as statut_courrier,
+                c.code_courrier, 
+                c.objet as courrier_objet, 
+                c.type_courrier,
+                c.expediteur,
+                c.priorite as priorite_courrier, 
+                c.statut as statut_courrier,
                 CONCAT(u_coteur.prenom, ' ', u_coteur.nom) as coteur_nom,
                 CONCAT(u_assigne.prenom, ' ', u_assigne.nom) as assigne_nom,
                 sh.service_name
@@ -346,10 +304,16 @@ public class CotationService {
     public List<CotationCourrier> getCotationsByCourrier(int courrierId) {
         List<CotationCourrier> cotations = new ArrayList<>();
         
+        // REQUÊTE SQL CORRIGÉE:
         String sql = """
             SELECT 
                 cot.*,
-                c.code_courrier, c.objet as courrier_objet, c.priorite as priorite_courrier, c.statut as statut_courrier,
+                c.code_courrier, 
+                c.objet as courrier_objet, 
+                c.type_courrier,
+                c.expediteur,
+                c.priorite as priorite_courrier, 
+                c.statut as statut_courrier,
                 CONCAT(u_coteur.prenom, ' ', u_coteur.nom) as coteur_nom,
                 CONCAT(u_assigne.prenom, ' ', u_assigne.nom) as assigne_nom,
                 sh.service_name
@@ -428,6 +392,8 @@ public class CotationService {
         // Champs additionnels
         cotation.setCourrierCode(rs.getString("code_courrier"));
         cotation.setCourrierObjet(rs.getString("courrier_objet"));
+        cotation.setTypeCourrier(rs.getString("type_courrier"));          // AJOUTÉ
+        cotation.setExpediteurCourrier(rs.getString("expediteur"));       // AJOUTÉ
         cotation.setCoteurNom(rs.getString("coteur_nom"));
         cotation.setAssigneNom(rs.getString("assigne_nom"));
         cotation.setServiceName(rs.getString("service_name"));
@@ -502,6 +468,338 @@ public class CotationService {
         } catch (SQLException e) {
             System.err.println("Erreur enregistrement batch: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Récupère tous les courriers assignés à un utilisateur
+     * LOGIQUE AMÉLIORÉE:
+     * - Si l'utilisateur est responsable courrier: cotations + courriers "nouveau"
+     * - Sinon: uniquement les cotations qui lui sont assignées
+     */
+    public List<CotationCourrier> getMesCourriersEtCotations(int userId) {
+        List<CotationCourrier> result = new ArrayList<>();
+        
+        try (Connection conn = DatabaseService.getInstance().getConnection()) {
+            
+            // Vérifier si l'utilisateur est responsable courrier
+            boolean estResponsableCourrier = isResponsableCourrier(conn, userId);
+            
+            if (estResponsableCourrier) {
+                // RESPONSABLE COURRIER: Récupérer cotations + courriers "nouveau"
+                result = getMesCourriersResponsable(conn, userId);
+            } else {
+                // UTILISATEUR NORMAL: Uniquement les cotations assignées
+                result = getCotationsAssigneesA(userId);
+            }
+            
+            System.out.println("✓ " + result.size() + " courriers chargés pour user " + userId + 
+                             " (responsable=" + estResponsableCourrier + ")");
+            
+        } catch (SQLException e) {
+            System.err.println("Erreur récupération courriers: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return result;
+    }
+
+    /**
+     * Vérifie si un utilisateur est responsable courrier
+     */
+    private boolean isResponsableCourrier(Connection conn, int userId) throws SQLException {
+        String sql = """
+            SELECT COUNT(*) 
+            FROM config_responsable_courrier 
+            WHERE user_id = ? AND actif = TRUE
+        """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Récupère les courriers pour un responsable courrier
+     * Combine: cotations assignées + courriers "nouveau" non encore cotés
+     */
+    private List<CotationCourrier> getMesCourriersResponsable(Connection conn, int userId) throws SQLException {
+        List<CotationCourrier> courriers = new ArrayList<>();
+        
+        // 1. D'abord, récupérer toutes les cotations assignées (comme avant)
+        courriers.addAll(getCotationsAssigneesA(userId));
+        
+        // 2. Ensuite, récupérer les courriers "nouveau" qui n'ont PAS encore de cotation
+        String sqlNouveaux = """
+            SELECT 
+                c.id as courrier_id,
+                c.code_courrier,
+                c.objet as courrier_objet,
+                c.type_courrier,
+                c.expediteur,
+                c.priorite as priorite_courrier,
+                c.statut as statut_courrier,
+                c.date_courrier,
+                c.date_creation
+            FROM courriers c
+            WHERE c.statut = 'nouveau'
+            AND NOT EXISTS (
+                SELECT 1 FROM cotations_courriers cot WHERE cot.courrier_id = c.id
+            )
+            ORDER BY 
+                CASE c.priorite 
+                    WHEN 'TRES_URGENTE' THEN 1
+                    WHEN 'URGENTE' THEN 2
+                    WHEN 'NORMALE' THEN 3
+                    ELSE 4
+                END,
+                c.date_creation DESC
+        """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sqlNouveaux);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            while (rs.next()) {
+                // Créer une pseudo-cotation pour les courriers nouveaux
+                CotationCourrier cotation = createPseudoCotationFromNewCourrier(rs, userId);
+                courriers.add(cotation);
+            }
+        }
+        
+        // Trier par priorité et date
+        courriers.sort((c1, c2) -> {
+            // D'abord les en retard
+            if (c1.isEnRetard() && !c2.isEnRetard()) return -1;
+            if (!c1.isEnRetard() && c2.isEnRetard()) return 1;
+            
+            // Ensuite par priorité
+            int p1 = getPrioriteOrder(c1.getPriorite());
+            int p2 = getPrioriteOrder(c2.getPriorite());
+            if (p1 != p2) return Integer.compare(p1, p2);
+            
+            // Enfin par date d'échéance
+            if (c1.getDateEcheance() != null && c2.getDateEcheance() != null) {
+                return c1.getDateEcheance().compareTo(c2.getDateEcheance());
+            }
+            
+            return 0;
+        });
+        
+        return courriers;
+    }
+
+    /**
+     * Crée une pseudo-cotation pour un courrier "nouveau" non coté
+     */
+    private CotationCourrier createPseudoCotationFromNewCourrier(ResultSet rs, int userId) throws SQLException {
+        CotationCourrier cotation = new CotationCourrier();
+        
+        // ID négatif pour identifier les pseudo-cotations
+        cotation.setId(-rs.getInt("courrier_id"));
+        
+        cotation.setCourrierId(rs.getInt("courrier_id"));
+        cotation.setCourrierCode(rs.getString("code_courrier"));
+        cotation.setCourrierObjet(rs.getString("courrier_objet"));
+        
+        // AJOUTÉ: Type et expéditeur du courrier
+        cotation.setTypeCourrier(rs.getString("type_courrier"));
+        cotation.setExpediteurCourrier(rs.getString("expediteur"));
+        
+        // Pseudo-assignation (responsable courrier reçoit automatiquement)
+        cotation.setCoteA(userId);
+        cotation.setAssigneNom("Responsable Courrier");
+        cotation.setCoteurNom("Système (nouveau)");
+        
+        // Statut et priorité
+        cotation.setStatut("en_attente");
+        String prioriteCourrier = rs.getString("priorite_courrier");
+        cotation.setPriorite(prioriteCourrier != null ? prioriteCourrier : "NORMALE");
+        cotation.setPrioriteCourrier(prioriteCourrier);
+        cotation.setStatutCourrier(rs.getString("statut_courrier"));
+        
+        // Échéance calculée selon la priorité
+        Timestamp dateCreation = rs.getTimestamp("date_creation");
+        if (dateCreation != null) {
+            LocalDateTime creation = dateCreation.toLocalDateTime();
+            cotation.setDateCotation(creation);
+            
+            // Délai selon priorité
+            int delai = switch (prioriteCourrier != null ? prioriteCourrier.toUpperCase() : "NORMALE") {
+                case "TRES_URGENTE" -> 1;
+                case "URGENTE" -> 2;
+                default -> 3;
+            };
+            
+            cotation.setDelaiJours(delai);
+            cotation.setDateEcheance(creation.plusDays(delai));
+        }
+        
+        cotation.setCommentaire("Courrier nouveau - À traiter en priorité");
+        
+        return cotation;
+    }
+
+    /**
+     * Retourne l'ordre de priorité pour le tri
+     */
+    private int getPrioriteOrder(String priorite) {
+        if (priorite == null) return 3;
+        return switch (priorite.toUpperCase()) {
+            case "TRES_URGENTE" -> 1;
+            case "URGENTE" -> 2;
+            case "NORMALE" -> 3;
+            default -> 4;
+        };
+    }
+
+    // ============================================================================
+    // MODIFICATION DE LA MÉTHODE coterCourrier
+    // Ajouter la logique de changement de statut à "en_cours"
+    // ============================================================================
+
+    /**
+     * Cote un courrier à un utilisateur
+     * MODIFIÉ: Change le statut du courrier en "en_cours" lors de la première cotation
+     */
+    public boolean coterCourrier(Courrier courrier, User cotePar, User coteA, 
+                                 String commentaire, String priorite, int delaiJours, 
+                                 boolean notifier) {
+        
+        String sql = """
+            INSERT INTO cotations_courriers 
+            (courrier_id, cote_par, cote_a, service_destination, commentaire, 
+             priorite, date_echeance, delai_jours, statut, notifier_utilisateur)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?)
+        """;
+        
+        try (Connection conn = DatabaseService.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            LocalDateTime dateEcheance = LocalDateTime.now().plusDays(delaiJours);
+            
+            stmt.setInt(1, courrier.getId());
+            stmt.setInt(2, cotePar.getId());
+            stmt.setInt(3, coteA.getId());
+            stmt.setString(4, coteA.getServiceCode());
+            stmt.setString(5, commentaire);
+            stmt.setString(6, priorite);
+            stmt.setTimestamp(7, Timestamp.valueOf(dateEcheance));
+            stmt.setInt(8, delaiJours);
+            stmt.setBoolean(9, notifier);
+            
+            int rowsAffected = stmt.executeUpdate();
+            
+            if (rowsAffected > 0) {
+                // NOUVEAU: Vérifier si c'est la première cotation
+                boolean premiereCalCotation = isPremiereColontation(conn, courrier.getId());
+                
+                // NOUVEAU: Si première cotation ET statut=nouveau, passer à "en_cours"
+                if (premiereCalCotation && "nouveau".equalsIgnoreCase(courrier.getStatut())) {
+                    updateCourrierStatut(courrier.getId(), "en_cours");
+                    System.out.println("✓ Statut du courrier changé: nouveau -> en_cours");
+                } else {
+                    // Sinon, juste mettre à jour comme avant (si pas déjà en_cours)
+                    if ("nouveau".equalsIgnoreCase(courrier.getStatut())) {
+                        updateCourrierStatut(courrier.getId(), "en_cours");
+                    }
+                }
+                
+                // Enregistrer dans l'historique
+                enregistrerHistorique(courrier.getId(), cotePar.getId(), "cotation",
+                    "Courrier coté à " + coteA.getNomComplet());
+                
+                System.out.println("✓ Cotation créée avec succès");
+                return true;
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Erreur lors de la cotation: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return false;
+    }
+
+    /**
+     * Vérifie si c'est la première cotation du courrier
+     * (avant l'insertion de la nouvelle cotation, compte = 0)
+     */
+    private boolean isPremiereColontation(Connection conn, int courrierId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM cotations_courriers WHERE courrier_id = ?";
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, courrierId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) == 1; // == 1 car on vient juste d'insérer
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    // ============================================================================
+    // MÉTHODE UTILITAIRE POUR RÉCUPÉRER LES RESPONSABLES COURRIER
+    // ============================================================================
+
+    /**
+     * Récupère la liste des utilisateurs responsables courrier
+     */
+    public List<User> getResponsablesCourrier() {
+        List<User> responsables = new ArrayList<>();
+        
+        String sql = """
+            SELECT DISTINCT u.*
+            FROM users u
+            INNER JOIN config_responsable_courrier crc ON u.id = crc.user_id
+            WHERE crc.actif = TRUE AND u.actif = TRUE
+            ORDER BY u.nom, u.prenom
+        """;
+        
+        try (Connection conn = DatabaseService.getInstance().getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                // Utiliser la méthode DatabaseService pour mapper le User
+                // (Cette méthode devrait être exposée ou on peut dupliquer le code)
+                User user = mapResultSetToUser(rs);
+                responsables.add(user);
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Erreur récupération responsables courrier: " + e.getMessage());
+        }
+        
+        return responsables;
+    }
+
+    /**
+     * Mapper un ResultSet vers un User (méthode simplifiée)
+     * NOTE: Dans un vrai projet, cette méthode devrait être dans DatabaseService
+     */
+    private User mapResultSetToUser(ResultSet rs) throws SQLException {
+        User user = new User();
+        user.setId(rs.getInt("id"));
+        user.setCode(rs.getString("code"));
+        user.setNom(rs.getString("nom"));
+        user.setPrenom(rs.getString("prenom"));
+        user.setEmail(rs.getString("email"));
+        user.setActif(rs.getBoolean("actif"));
+        user.setServiceCode(rs.getString("service_code"));
+        user.setNiveauAutorite(rs.getInt("niveau_autorite"));
+        
+        // Le rôle devra être chargé séparément si nécessaire
+        return user;
     }
     
     // ============================================================================
