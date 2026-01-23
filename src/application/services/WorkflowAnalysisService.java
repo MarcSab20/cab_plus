@@ -14,7 +14,9 @@ import java.util.stream.Collectors;
 public class WorkflowAnalysisService {
     private static WorkflowAnalysisService instance;
     private Map<String, ServiceHierarchy> hierarchyCache;
-    private WorkflowAnalysisService() {}
+    private WorkflowAnalysisService() {
+    	loadHierarchyCache();
+    }
     
     public static synchronized WorkflowAnalysisService getInstance() {
         if (instance == null) {
@@ -223,6 +225,67 @@ public class WorkflowAnalysisService {
     }
     
     /**
+     * Charge la hiérarchie des services dans le cache
+     */
+    private void loadHierarchyCache() {
+        hierarchyCache = new HashMap<>();
+        
+        String sql = """
+            SELECT 
+                service_code,
+                service_name,
+                parent_code,
+                niveau,
+                icone,
+                actif
+            FROM service_hierarchy
+            WHERE actif = TRUE
+            ORDER BY niveau ASC, service_name ASC
+        """;
+        
+        try (Connection conn = DatabaseService.getInstance().getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            // Première passe : créer tous les services
+            Map<String, ServiceHierarchy> tempMap = new HashMap<>();
+            while (rs.next()) {
+                ServiceHierarchy service = new ServiceHierarchy();
+                service.setServiceCode(rs.getString("service_code"));
+                service.setServiceName(rs.getString("service_name"));
+                service.setParentServiceCode(rs.getString("parent_code"));
+                service.setNiveau(rs.getInt("niveau"));
+                //service.setIcone(rs.getString("icone"));
+                service.setActif(rs.getBoolean("actif"));
+                
+                tempMap.put(service.getServiceCode(), service);
+            }
+            
+            // Deuxième passe : établir les relations parent-enfant
+            for (ServiceHierarchy service : tempMap.values()) {
+                String parentCode = service.getParentServiceCode();
+                if (parentCode != null && !parentCode.isEmpty()) {
+                    ServiceHierarchy parent = tempMap.get(parentCode);
+                    if (parent != null) {
+                        service.setParent(parent);
+                        parent.ajouterEnfant(service);
+                    }
+                }
+                
+                hierarchyCache.put(service.getServiceCode(), service);
+            }
+            
+            System.out.println("✓ Cache hiérarchie chargé: " + hierarchyCache.size() + " services");
+            
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur chargement hiérarchie services: " + e.getMessage());
+            e.printStackTrace();
+            // Initialiser avec un cache vide plutôt que null
+            hierarchyCache = new HashMap<>();
+        }
+    }
+    
+    /**
      * Calcule un score de sévérité pour un goulot (0-100)
      */
     private int calculateSeverityScore(int courriersEnRetard, double heuresRetard, double dureeTraitement) {
@@ -402,14 +465,32 @@ public class WorkflowAnalysisService {
         if (serviceCode == null || serviceCode.isEmpty()) {
             return null;
         }
+        
+        // Vérifier que le cache est initialisé
+        if (hierarchyCache == null) {
+            System.err.println("⚠️ hierarchyCache non initialisé, rechargement...");
+            loadHierarchyCache();
+        }
+        
         return hierarchyCache.get(serviceCode);
     }
+
     
     /**
      * Récupère tous les services actifs
      */
     public List<ServiceHierarchy> getAllServices() {
+        // Vérifier que le cache est initialisé
+        if (hierarchyCache == null) {
+            System.err.println("⚠️ hierarchyCache non initialisé, rechargement...");
+            loadHierarchyCache();
+        }
+        
         return new ArrayList<>(hierarchyCache.values());
+    }
+    
+    public void reloadHierarchyCache() {
+        loadHierarchyCache();
     }
     
     /**

@@ -13,7 +13,7 @@
          
          <!-- En-tête principal -->
          <HBox alignment="CENTER_LEFT" spacing="20.0" style="-fx-padding: 15 25;">
-            <Label style="-fx-text-fill: white; -fx-font-weight: bold;" text="📋 Gestion Documentaire">
+            <Label style="-fx-text-fill: white; -fx-font-weight: bold;" text="📋 Gestion des Courriers">
                <font>
                   <Font size="24.0" />
                </font>

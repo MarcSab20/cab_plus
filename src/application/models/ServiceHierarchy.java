@@ -288,6 +288,7 @@ public class ServiceHierarchy {
         return false;
     }
     
+    
     /**
      * Retourne l'icône appropriée selon le niveau et le statut
      */
