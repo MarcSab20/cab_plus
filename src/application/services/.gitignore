@@ -20,3 +20,8 @@
 /NotificationCourrierService.class
 /CotationService.class
 /CotationService$BatchOperationResult.class
+/WorkflowAnalysisService.class
+/WorkflowAnalysisService$GoulotInfo.class
+/WorkflowAnalysisService$ServiceDetailedStats.class
+/WorkflowAnalysisService$ServiceFlowStats.class
+/WorkflowAnalysisService$ServiceStats.class

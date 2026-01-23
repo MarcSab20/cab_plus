@@ -196,44 +196,6 @@ public class WorkflowService {
         return null;
     }
     
-    /**
-     * Récupère les courriers visibles pour un utilisateur donné
-     */
-    public List<Courrier> getCourriersVisiblesPourUtilisateur(User user) {
-        List<Courrier> courriers = new ArrayList<>();
-        
-        // Si l'utilisateur n'a pas de service (CEMAA/CSP niveau 0), il voit tous les courriers
-        if (user.getServiceCode() == null || user.getServiceCode().isEmpty() || user.getNiveauAutorite() == 0) {
-            return CourrierService.getInstance().getAllCourriersEnWorkflow();
-        }
-        
-        // Sinon, récupérer uniquement les courriers où l'utilisateur a participé
-        String sql = "SELECT DISTINCT c.* " +
-                     "FROM courriers c " +
-                     "INNER JOIN courrier_workflow w ON c.id = w.courrier_id " +
-                     "WHERE c.workflow_actif = 1 " +
-                     "AND (w.user_id = ? OR w.service_code = ?) " +
-                     "ORDER BY c.date_reception DESC";
-        
-        try (Connection conn = DatabaseService.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, user.getId());
-            stmt.setString(2, user.getServiceCode());
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Courrier courrier = DatabaseService.mapResultSetToCourrier(rs);
-                    courriers.add(courrier);
-                }
-            }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        return courriers;
-    }
     
     /**
      * Transfère un courrier vers un autre service
@@ -539,73 +501,7 @@ public class WorkflowService {
         return 1;
     }
     
-    /**
-     * Démarre le workflow pour un courrier
-     */
-    public boolean startWorkflow(Courrier courrier, String serviceInitial) {
-        Connection conn = null;
-        try {
-            conn = DatabaseService.getInstance().getConnection();
-            conn.setAutoCommit(false);
-            
-            // 1. Créer la première étape du workflow
-            String insertSql = "INSERT INTO courrier_workflow " +
-                              "(courrier_id, etape_numero, service_code, action, commentaire, " +
-                              "date_action, statut_etape) " +
-                              "VALUES (?, 1, ?, 'Initialisation', 'Workflow démarré', NOW(), 'en_attente')";
-            
-            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-                stmt.setInt(1, courrier.getId());
-                stmt.setString(2, serviceInitial);
-                stmt.executeUpdate();
-            }
-            
-            // 2. Mettre à jour le courrier
-            String updateSql = "UPDATE courriers SET " +
-                              "workflow_actif = 1, " +
-                              "service_actuel = ?, " +
-                              "etape_actuelle = 1, " +
-                              "statut = 'en_cours' " +
-                              "WHERE id = ?";
-            
-            try (PreparedStatement stmt = conn.prepareStatement(updateSql)) {
-                stmt.setString(1, serviceInitial);
-                stmt.setInt(2, courrier.getId());
-                stmt.executeUpdate();
-            }
-            
-            // 3. Mettre à jour l'objet courrier
-            courrier.activerWorkflow(serviceInitial);
-            
-            conn.commit();
-            
-            // 4. Notifier via le réseau
-            NetworkService.getInstance().notifyWorkflowUpdate(courrier.getId(), serviceInitial);
-            
-            return true;
-            
-        } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            }
-            e.printStackTrace();
-            return false;
-            
-        } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
+    
     
     /**
      * Termine le workflow d'un courrier
