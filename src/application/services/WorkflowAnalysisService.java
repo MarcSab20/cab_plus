@@ -234,9 +234,8 @@ public class WorkflowAnalysisService {
             SELECT 
                 service_code,
                 service_name,
-                parent_code,
+                parent_service_code,
                 niveau,
-                icone,
                 actif
             FROM service_hierarchy
             WHERE actif = TRUE
@@ -253,9 +252,8 @@ public class WorkflowAnalysisService {
                 ServiceHierarchy service = new ServiceHierarchy();
                 service.setServiceCode(rs.getString("service_code"));
                 service.setServiceName(rs.getString("service_name"));
-                service.setParentServiceCode(rs.getString("parent_code"));
+                service.setParentServiceCode(rs.getString("parent_service_code"));
                 service.setNiveau(rs.getInt("niveau"));
-                //service.setIcone(rs.getString("icone"));
                 service.setActif(rs.getBoolean("actif"));
                 
                 tempMap.put(service.getServiceCode(), service);
