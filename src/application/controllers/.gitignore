@@ -56,3 +56,9 @@
 /MessagerieCourrierController.class
 /MessagerieCourrierController$1.class
 /WorkflowSuiviController$EvenementParcours.class
+/WorkflowSuiviController$CourrierVisuItem.class
+/WorkflowSuiviController$FluxData.class
+/WorkflowSuiviController$ModeVisualisation.class
+/WorkflowSuiviController$ModeVisualisationItem.class
+/WorkflowSuiviController$PeriodeItem.class
+/WorkflowSuiviController$ServiceNodeData.class

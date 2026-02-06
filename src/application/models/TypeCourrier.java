@@ -4,17 +4,19 @@ package application.models;
  * Énumération pour le type de courrier
  */
 public enum TypeCourrier {
-    ENTRANT("Entrant", "📥"),
-    SORTANT("Sortant", "📤"),
-    INTERNE("Interne", "🔄"),
-    URGENT("Urgent", "🚨");
+	ENTRANT("Entrant", "📥", "#e67e22"),
+    SORTANT("Sortant", "📤", "#3498db"),
+    INTERNE("Interne", "🔄", "#95a5a6"),
+    URGENT("Urgent", "🚨", "#ff0000");
     
     private final String libelle;
     private final String icone;
+    private final String couleur;
     
-    TypeCourrier(String libelle, String icone) {
+    TypeCourrier(String libelle, String icone, String couleur) {
         this.libelle = libelle;
         this.icone = icone;
+        this.couleur = couleur;
     }
     
     public String getLibelle() {
@@ -25,26 +27,20 @@ public enum TypeCourrier {
         return icone;
     }
     
+    public String getCouleur() {
+        return couleur;
+    }
+    
     /**
-     * Convertit un String en TypeCourrier
+     * Convertit une chaîne en TypeCourrier
      */
     public static TypeCourrier fromString(String value) {
-        if (value == null) {
-            return ENTRANT;
-        }
+        if (value == null) return null;
         
-        // Essayer de matcher directement
         try {
             return valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {
-            // Essayer avec des variations communes
-            String normalized = value.toLowerCase().replace(" ", "_");
-            try {
-                return valueOf(normalized.toUpperCase());
-            } catch (IllegalArgumentException ex) {
-                // Par défaut, retourner ENTRANT
-                return ENTRANT;
-            }
+            return null;
         }
     }
     
