@@ -2,10 +2,16 @@ package application.utils;
 
 import javafx.scene.chart.*;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
 import javafx.scene.control.Label;
 import javafx.geometry.Side;
-import application.models.Courrier;
-import application.models.WorkflowStep;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import application.models.*;
+import application.services.*;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -16,6 +22,271 @@ import java.util.stream.Collectors;
  * Fournit des visualisations professionnelles et interactives
  */
 public class AdvancedStatisticsGenerator {
+    
+    /**
+     * Génère les statistiques globales
+     */
+    public VBox generateGlobalStats(List<Courrier> courriers, LocalDateTime dateDebut, LocalDateTime dateFin) {
+        VBox container = new VBox(15);
+        container.setPadding(new Insets(15));
+        container.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+        
+        // Titre
+        Label titre = new Label("📊 STATISTIQUES GLOBALES");
+        titre.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #2c3e50;");
+        
+        // Période
+        Label periode = new Label(String.format("Période: %s au %s",
+            dateDebut.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+            dateFin.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+        periode.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+        
+        // Grille de statistiques
+        GridPane grid = new GridPane();
+        grid.setHgap(20);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(15, 0, 0, 0));
+        
+        int row = 0;
+        
+        // Total courriers
+        grid.add(createStatLabel("📧 Total courriers:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(courriers.size())), 1, row++);
+        
+        // Par type
+        Map<String, Long> parType = courriers.stream()
+            .collect(Collectors.groupingBy(
+                c -> c.getTypeCourrier() != null ? c.getTypeCourrier() : "INCONNU",
+                Collectors.counting()
+            ));
+        
+        grid.add(createStatLabel("📥 Entrants:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parType.getOrDefault("ENTRANT", 0L))), 1, row++);
+        
+        grid.add(createStatLabel("📤 Sortants:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parType.getOrDefault("SORTANT", 0L))), 1, row++);
+        
+        grid.add(createStatLabel("🔄 Internes:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parType.getOrDefault("INTERNE", 0L))), 1, row++);
+        
+        // Par statut
+        Map<String, Long> parStatut = courriers.stream()
+            .collect(Collectors.groupingBy(
+                c -> c.getStatut() != null ? c.getStatut() : "inconnu",
+                Collectors.counting()
+            ));
+        
+        grid.add(createStatLabel("🆕 Nouveaux:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parStatut.getOrDefault("nouveau", 0L))), 1, row++);
+        
+        grid.add(createStatLabel("⏳ En cours:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parStatut.getOrDefault("en_cours", 0L))), 1, row++);
+        
+        grid.add(createStatLabel("✅ Traités:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parStatut.getOrDefault("traite", 0L))), 1, row++);
+        
+        grid.add(createStatLabel("📦 Archivés:"), 0, row);
+        grid.add(createValueLabel(String.valueOf(parStatut.getOrDefault("archive", 0L))), 1, row++);
+        
+        // Graphique de répartition par type
+        PieChart typeChart = createTypeDistributionChart(
+            parType.entrySet().stream()
+                .collect(Collectors.toMap(
+                    e -> getTypeLibelle(e.getKey()),
+                    e -> e.getValue().intValue()
+                )),
+            "Répartition par type"
+        );
+        typeChart.setPrefHeight(200);
+        
+        container.getChildren().addAll(titre, periode, grid, typeChart);
+        
+        return container;
+    }
+    
+    /**
+     * Génère les statistiques par service
+     */
+    public VBox generateServiceStats(List<Courrier> courriers, 
+                                     List<ServiceHierarchy> servicesAutorises,
+                                     WorkflowAnalysisService workflowService,
+                                     CotationService cotationService) {
+        VBox container = new VBox(15);
+        container.setPadding(new Insets(15));
+        container.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+        
+        Label titre = new Label("🏢 STATISTIQUES PAR SERVICE");
+        titre.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #2c3e50;");
+        
+        // Calculer stats par service
+        Map<String, Integer> courriersByService = new HashMap<>();
+        
+        for (Courrier courrier : courriers) {
+            List<CotationCourrier> cotations = cotationService.getCotationsByCourrier(courrier.getId());
+            for (CotationCourrier cot : cotations) {
+                String serviceCode = cot.getServiceDestination();
+                if (serviceCode != null) {
+                    courriersByService.merge(serviceCode, 1, Integer::sum);
+                }
+            }
+        }
+        
+        // Créer les cartes pour chaque service
+        VBox servicesBox = new VBox(10);
+        
+        for (ServiceHierarchy service : servicesAutorises) {
+            int count = courriersByService.getOrDefault(service.getServiceCode(), 0);
+            if (count > 0) {
+                HBox serviceCard = createServiceStatCard(service, count);
+                servicesBox.getChildren().add(serviceCard);
+            }
+        }
+        
+        // Graphique en barres
+        if (!courriersByService.isEmpty()) {
+            Map<String, Integer> topServices = courriersByService.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .collect(Collectors.toMap(
+                    e -> {
+                        ServiceHierarchy s = workflowService.getServiceByCode(e.getKey());
+                        return s != null ? s.getServiceName() : e.getKey();
+                    },
+                    Map.Entry::getValue,
+                    (a, b) -> a,
+                    LinkedHashMap::new
+                ));
+            
+            BarChart<String, Number> chart = createServiceDistributionChart(
+                topServices,
+                "Top 10 des services"
+            );
+            chart.setPrefHeight(250);
+            container.getChildren().add(chart);
+        }
+        
+        container.getChildren().addAll(titre, servicesBox);
+        
+        return container;
+    }
+    
+    /**
+     * Génère les statistiques temporelles
+     */
+    public VBox generateTemporalStats(List<Courrier> courriers, 
+                                      LocalDateTime dateDebut, 
+                                      LocalDateTime dateFin) {
+        VBox container = new VBox(15);
+        container.setPadding(new Insets(15));
+        container.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+        
+        Label titre = new Label("📈 ÉVOLUTION TEMPORELLE");
+        titre.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #2c3e50;");
+        
+        // Grouper par jour
+        Map<String, Integer> parJour = courriers.stream()
+            .filter(c -> c.getDateCreation() != null)
+            .collect(Collectors.groupingBy(
+                c -> c.getDateCreation().format(DateTimeFormatter.ofPattern("dd/MM")),
+                LinkedHashMap::new,
+                Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
+            ));
+        
+        if (!parJour.isEmpty()) {
+            LineChart<String, Number> dailyChart = createTimelineChart(
+                parJour,
+                "Courriers par jour"
+            );
+            dailyChart.setPrefHeight(200);
+            container.getChildren().add(dailyChart);
+        }
+        
+        // Grouper par mois si période > 60 jours
+        long daysBetween = java.time.Duration.between(dateDebut, dateFin).toDays();
+        if (daysBetween > 60) {
+            Map<String, Integer> parMois = courriers.stream()
+                .filter(c -> c.getDateCreation() != null)
+                .collect(Collectors.groupingBy(
+                    c -> c.getDateCreation().format(DateTimeFormatter.ofPattern("MM/yyyy")),
+                    LinkedHashMap::new,
+                    Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
+                ));
+            
+            if (!parMois.isEmpty()) {
+                LineChart<String, Number> monthlyChart = createTimelineChart(
+                    parMois,
+                    "Courriers par mois"
+                );
+                monthlyChart.setPrefHeight(200);
+                container.getChildren().add(monthlyChart);
+            }
+        }
+        
+        container.getChildren().add(0, titre);
+        
+        return container;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTHODES PRIVÉES D'AIDE
+    // ═══════════════════════════════════════════════════════════════
+    
+    private Label createStatLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-weight: bold; -fx-text-fill: #34495e; -fx-font-size: 12px;");
+        return label;
+    }
+    
+    private Label createValueLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        return label;
+    }
+    
+    private String getTypeLibelle(String type) {
+        return switch (type.toUpperCase()) {
+            case "ENTRANT" -> "📥 Entrant";
+            case "SORTANT" -> "📤 Sortant";
+            case "INTERNE" -> "🔄 Interne";
+            default -> type;
+        };
+    }
+    
+    private HBox createServiceStatCard(ServiceHierarchy service, int count) {
+        HBox card = new HBox(15);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setPadding(new Insets(10));
+        card.setStyle(
+            "-fx-background-color: #f8f9fa;" +
+            "-fx-border-color: " + service.getCouleur() + ";" +
+            "-fx-border-width: 0 0 0 4;" +
+            "-fx-background-radius: 5;"
+        );
+        
+        Label icon = new Label(service.getIcone());
+        icon.setStyle("-fx-font-size: 20px;");
+        
+        VBox info = new VBox(3);
+        Label name = new Label(service.getServiceName());
+        name.setStyle("-fx-font-weight: bold; -fx-font-size: 12px;");
+        
+        Label code = new Label(service.getServiceCode());
+        code.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+        
+        info.getChildren().addAll(name, code);
+        HBox.setHgrow(info, Priority.ALWAYS);
+        
+        Label countLabel = new Label(String.valueOf(count));
+        countLabel.setStyle(
+            "-fx-font-size: 20px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-text-fill: " + service.getCouleur() + ";"
+        );
+        
+        card.getChildren().addAll(icon, info, countLabel);
+        
+        return card;
+    }
     
     /**
      * Génère un graphique en barres pour la répartition par service
@@ -34,19 +305,12 @@ public class AdvancedStatisticsGenerator {
         
         XYChart.Series<String, Number> series = new XYChart.Series<>();
         
-        // Trier par valeur décroissante
-        serviceData.entrySet().stream()
-            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-            .limit(10) // Top 10
-            .forEach(entry -> {
-                XYChart.Data<String, Number> data = new XYChart.Data<>(entry.getKey(), entry.getValue());
-                series.getData().add(data);
-            });
+        serviceData.forEach((service, count) -> {
+            XYChart.Data<String, Number> data = new XYChart.Data<>(service, count);
+            series.getData().add(data);
+        });
         
         barChart.getData().add(series);
-        barChart.setPrefHeight(300);
-        
-        // Style moderne
         barChart.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
         
         return barChart;
@@ -70,7 +334,6 @@ public class AdvancedStatisticsGenerator {
             pieChart.getData().add(slice);
         });
         
-        pieChart.setPrefHeight(250);
         pieChart.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
         
         return pieChart;
@@ -92,251 +355,15 @@ public class AdvancedStatisticsGenerator {
         lineChart.setCreateSymbols(true);
         
         XYChart.Series<String, Number> series = new XYChart.Series<>();
-        series.setName("Courriers traités");
+        series.setName("Courriers");
         
         timelineData.forEach((period, count) -> 
             series.getData().add(new XYChart.Data<>(period, count))
         );
         
         lineChart.getData().add(series);
-        lineChart.setPrefHeight(300);
         lineChart.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
         
         return lineChart;
-    }
-    
-    /**
-     * Génère un graphique de zones empilées pour les statuts
-     */
-    public static StackedBarChart<String, Number> createStatusStackedChart(
-            Map<String, Map<String, Integer>> statusByService, String title) {
-        
-        CategoryAxis xAxis = new CategoryAxis();
-        NumberAxis yAxis = new NumberAxis();
-        xAxis.setLabel("Services");
-        yAxis.setLabel("Nombre de courriers");
-        
-        StackedBarChart<String, Number> stackedChart = new StackedBarChart<>(xAxis, yAxis);
-        stackedChart.setTitle(title);
-        
-        // Créer une série par statut
-        Map<String, XYChart.Series<String, Number>> seriesMap = new HashMap<>();
-        String[] statuts = {"nouveau", "en_cours", "traite", "archive"};
-        
-        for (String statut : statuts) {
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName(capitalizeFirst(statut));
-            seriesMap.put(statut, series);
-        }
-        
-        // Remplir les données
-        statusByService.forEach((service, statusCounts) -> {
-            for (String statut : statuts) {
-                int count = statusCounts.getOrDefault(statut, 0);
-                seriesMap.get(statut).getData().add(
-                    new XYChart.Data<>(service, count)
-                );
-            }
-        });
-        
-        stackedChart.getData().addAll(seriesMap.values());
-        stackedChart.setPrefHeight(350);
-        stackedChart.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
-        
-        return stackedChart;
-    }
-    
-    /**
-     * Génère des cartes de statistiques avancées
-     */
-    public static VBox createAdvancedStatsCards(
-            List<Courrier> courriers, 
-            List<WorkflowStep> allSteps) {
-        
-        VBox container = new VBox(15);
-        container.setStyle("-fx-padding: 10;");
-        
-        // Calculs statistiques
-        int totalCourriers = courriers.size();
-        long urgents = courriers.stream()
-            .filter(c -> "URGENTE".equals(c.getPriorite()) || "TRES_URGENTE".equals(c.getPriorite()))
-            .count();
-        
-        long traites = courriers.stream()
-            .filter(c -> "traite".equalsIgnoreCase(c.getStatut()))
-            .count();
-        
-        double tauxTraitement = totalCourriers > 0 ? 
-            (traites * 100.0 / totalCourriers) : 0;
-        
-        // Durée moyenne de traitement
-        double dureeMoyenne = calculateAverageDuration(allSteps);
-        
-        // Créer les cartes
-        container.getChildren().addAll(
-            createStatCard("📊 Taux de traitement", 
-                String.format("%.1f%%", tauxTraitement), 
-                tauxTraitement >= 80 ? "#27ae60" : "#e74c3c"),
-            
-            createStatCard("🚨 Courriers urgents", 
-                String.format("%d / %d", urgents, totalCourriers),
-                "#e67e22"),
-            
-            createStatCard("⏱️ Durée moyenne", 
-                formatDuration(dureeMoyenne),
-                "#3498db"),
-            
-            createStatCard("📈 Efficacité globale",
-                calculateEfficiencyScore(courriers, allSteps),
-                "#9b59b6")
-        );
-        
-        return container;
-    }
-    
-    /**
-     * Crée une carte de statistique stylisée
-     */
-    private static VBox createStatCard(String title, String value, String color) {
-        VBox card = new VBox(8);
-        card.setStyle(String.format(
-            "-fx-background-color: %s; " +
-            "-fx-padding: 15; " +
-            "-fx-background-radius: 10; " +
-            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 5, 0, 0, 2);",
-            lightenColor(color, 0.9)
-        ));
-        
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: " + color + ";");
-        
-        Label valueLabel = new Label(value);
-        valueLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
-        
-        card.getChildren().addAll(titleLabel, valueLabel);
-        
-        return card;
-    }
-    
-    /**
-     * Calcule la durée moyenne de traitement
-     */
-    private static double calculateAverageDuration(List<WorkflowStep> steps) {
-        if (steps.isEmpty()) return 0;
-        
-        Map<Integer, List<WorkflowStep>> byCourrierSteps = steps.stream()
-            .collect(Collectors.groupingBy(WorkflowStep::getCourrierId));
-        
-        List<Long> durations = new ArrayList<>();
-        
-        byCourrierSteps.forEach((courrierId, courrierSteps) -> {
-            if (courrierSteps.size() >= 2) {
-                courrierSteps.sort(Comparator.comparing(WorkflowStep::getDateAction));
-                WorkflowStep first = courrierSteps.get(0);
-                WorkflowStep last = courrierSteps.get(courrierSteps.size() - 1);
-                
-                long hours = java.time.Duration.between(
-                    first.getDateAction(), 
-                    last.getDateAction()
-                ).toHours();
-                
-                durations.add(hours);
-            }
-        });
-        
-        return durations.stream()
-            .mapToLong(Long::longValue)
-            .average()
-            .orElse(0);
-    }
-    
-    /**
-     * Calcule un score d'efficacité global
-     */
-    private static String calculateEfficiencyScore(
-            List<Courrier> courriers, 
-            List<WorkflowStep> steps) {
-        
-        if (courriers.isEmpty()) return "N/A";
-        
-        double score = 100.0;
-        
-        // Pénalités
-        long nouveaux = courriers.stream()
-            .filter(c -> "nouveau".equalsIgnoreCase(c.getStatut()))
-            .count();
-        
-        long enCours = courriers.stream()
-            .filter(c -> "en_cours".equalsIgnoreCase(c.getStatut()))
-            .count();
-        
-        double ratio = (double) (nouveaux + enCours) / courriers.size();
-        score -= ratio * 30; // -30 points max pour les non-traités
-        
-        // Bonus pour rapidité
-        double avgDuration = calculateAverageDuration(steps);
-        if (avgDuration < 24) {
-            score += 10; // Bonus si traitement < 24h
-        } else if (avgDuration > 72) {
-            score -= 15; // Pénalité si > 72h
-        }
-        
-        score = Math.max(0, Math.min(100, score));
-        
-        return String.format("%.0f/100", score);
-    }
-    
-    /**
-     * Formate une durée en heures
-     */
-    private static String formatDuration(double heures) {
-        if (heures < 1) {
-            return String.format("%.0f min", heures * 60);
-        } else if (heures < 24) {
-            return String.format("%.1f h", heures);
-        } else {
-            return String.format("%.1f j", heures / 24);
-        }
-    }
-    
-    /**
-     * Capitalise la première lettre
-     */
-    private static String capitalizeFirst(String str) {
-        if (str == null || str.isEmpty()) return str;
-        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
-    }
-    
-    /**
-     * Éclaircit une couleur (version simplifiée)
-     */
-    private static String lightenColor(String color, double factor) {
-        // Implémentation simplifiée
-        return color + "33"; // Ajoute transparence
-    }
-    
-    /**
-     * Génère un rapport de performance par service
-     */
-    public static String generatePerformanceReport(
-            Map<String, Integer> serviceStats, 
-            Map<String, Double> durations) {
-        
-        StringBuilder report = new StringBuilder();
-        report.append("=== RAPPORT DE PERFORMANCE ===\n\n");
-        
-        serviceStats.forEach((service, count) -> {
-            double avgDuration = durations.getOrDefault(service, 0.0);
-            String performance = avgDuration < 24 ? "🟢 Excellent" :
-                               avgDuration < 48 ? "🟡 Satisfaisant" :
-                               "🔴 À améliorer";
-            
-            report.append(String.format("📊 %s:\n", service));
-            report.append(String.format("   Courriers: %d\n", count));
-            report.append(String.format("   Durée moy: %.1fh\n", avgDuration));
-            report.append(String.format("   Performance: %s\n\n", performance));
-        });
-        
-        return report.toString();
     }
 }

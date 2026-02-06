@@ -65,6 +65,35 @@ public class CourrierColorPalette {
     }
     
     /**
+     * Obtient une couleur par index (pour boucles) - INSTANCE METHOD
+     * @param index L'index de la couleur (0-based)
+     * @return Couleur JavaFX Color
+     */
+    public Color getColor(int index) {
+        String hexColor = MODERN_COLORS[index % MODERN_COLORS.length];
+        return Color.web(hexColor);
+    }
+    
+    /**
+     * Obtient une couleur hex par index - STATIC METHOD
+     * @param index L'index de la couleur (0-based)
+     * @return Couleur en format hex
+     */
+    public static String getColorHex(int index) {
+        return MODERN_COLORS[index % MODERN_COLORS.length];
+    }
+    
+    /**
+     * Obtient une couleur Color JavaFX par index - STATIC METHOD
+     * @param index L'index de la couleur (0-based)
+     * @return Couleur JavaFX Color
+     */
+    public static Color getColorObj(int index) {
+        String hexColor = MODERN_COLORS[index % MODERN_COLORS.length];
+        return Color.web(hexColor);
+    }
+    
+    /**
      * Obtient une couleur pour une priorité
      */
     public static String getColorForPriority(String priorite) {

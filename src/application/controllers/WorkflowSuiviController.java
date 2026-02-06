@@ -28,13 +28,16 @@ import javafx.util.Callback;
 import application.models.*;
 import application.services.*;
 import application.utils.*;
-
+import application.controllers.CourrierDetailDialog;
+import application.controllers.ArcCourriersDialog;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import application.utils.InteractiveGraphElements.GraphNode;
+import application.utils.InteractiveGraphElements.GraphArc;
 import java.util.stream.Collectors;
 
 /**
@@ -298,7 +301,7 @@ public class WorkflowSuiviController implements Initializable {
             ModeVisualisationItem selected = cbModeVisualisation.getValue();
             if (selected != null) {
                 modeActuel = selected.getMode();
-                onModeChanged();
+                adaptUIToMode();
             }
         });
     }
@@ -376,85 +379,96 @@ public class WorkflowSuiviController implements Initializable {
      * Configure la table des courriers
      */
     private void setupTableCourriers() {
-        // Colonnes
-        colCourrierCode.setCellValueFactory(new PropertyValueFactory<>("codeCourrier"));
-        colCourrierObjet.setCellValueFactory(new PropertyValueFactory<>("objet"));
-        colCourrierType.setCellValueFactory(new PropertyValueFactory<>("typeLibelle"));
-        colCourrierPriorite.setCellValueFactory(new PropertyValueFactory<>("prioriteLibelle"));
-        colCourrierStatut.setCellValueFactory(new PropertyValueFactory<>("statutLibelle"));
-        colCourrierEtapes.setCellValueFactory(new PropertyValueFactory<>("nbEtapes"));
-        colCourrierDuree.setCellValueFactory(new PropertyValueFactory<>("dureeFormatee"));
-        
-        // Colonne actions avec boutons
-        colCourrierActions.setCellFactory(createActionsCell());
-        
-        // Style des lignes selon priorité
-        tableCourriers.setRowFactory(tv -> {
-            TableRow<CourrierVisuItem> row = new TableRow<>() {
-                @Override
-                protected void updateItem(CourrierVisuItem item, boolean empty) {
-                    super.updateItem(item, empty);
+    // Colonnes
+    colCourrierCode.setCellValueFactory(new PropertyValueFactory<>("codeCourrier"));
+    colCourrierObjet.setCellValueFactory(new PropertyValueFactory<>("objet"));
+    colCourrierType.setCellValueFactory(new PropertyValueFactory<>("typeLibelle"));
+    colCourrierPriorite.setCellValueFactory(new PropertyValueFactory<>("prioriteLibelle"));
+    colCourrierStatut.setCellValueFactory(new PropertyValueFactory<>("statutLibelle"));
+    colCourrierEtapes.setCellValueFactory(new PropertyValueFactory<>("nbEtapes"));
+    colCourrierDuree.setCellValueFactory(new PropertyValueFactory<>("dureeFormatee"));
+    
+    // Colonne actions avec boutons
+    colCourrierActions.setCellFactory(createActionsCell());
+    
+    // Style des lignes selon priorité
+    tableCourriers.setRowFactory(tv -> {
+        TableRow<CourrierVisuItem> row = new TableRow<>() {
+            @Override
+            protected void updateItem(CourrierVisuItem item, boolean empty) {
+                super.updateItem(item, empty);
+                
+                if (empty || item == null) {
+                    setStyle("");
+                } else {
+                    // Bordure gauche selon la couleur du courrier
+                    Color color = courrierColors.get(item.getCourrierId());
+                    if (color != null) {
+                        String colorHex = String.format("#%02X%02X%02X",
+                            (int)(color.getRed() * 255),
+                            (int)(color.getGreen() * 255),
+                            (int)(color.getBlue() * 255));
+                        setStyle("-fx-border-color: " + colorHex + " transparent transparent transparent;" +
+                               "-fx-border-width: 0 0 0 4;");
+                    }
                     
-                    if (empty || item == null) {
-                        setStyle("");
-                    } else {
-                        // Bordure gauche selon la couleur du courrier
-                        Color color = courrierColors.get(item.getCourrierId());
-                        if (color != null) {
-                            String colorHex = String.format("#%02X%02X%02X",
-                                (int)(color.getRed() * 255),
-                                (int)(color.getGreen() * 255),
-                                (int)(color.getBlue() * 255));
-                            setStyle("-fx-border-color: " + colorHex + " transparent transparent transparent;" +
-                                   "-fx-border-width: 0 0 0 4;");
-                        }
-                        
-                        // Surbrillance si retard
-                        if (item.isEnRetard()) {
-                            setStyle(getStyle() + "-fx-background-color: #fdeaea;");
-                        }
+                    // Surbrillance si retard
+                    if (item.isEnRetard()) {
+                        setStyle(getStyle() + "-fx-background-color: #fdeaea;");
                     }
                 }
-            };
-            
-            // Double-clic pour voir le courrier
-            row.setOnMouseClicked(event -> {
-                if (event.getClickCount() == 2 && !row.isEmpty()) {
-                    voirCourrierDetails(row.getItem());
+            }
+        };
+        
+        // Double-clic pour voir le courrier
+        row.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && !row.isEmpty()) {
+                CourrierVisuItem item = row.getItem();
+                Courrier courrier = courrierService.getCourrierById(item.getCourrierId());
+                
+                if (courrier != null) {
+                    Platform.runLater(() -> {
+                        CourrierDetailDialog dialog = new CourrierDetailDialog(
+                            courrier,
+                            cotationService,
+                            workflowService
+                        );
+                        dialog.show();
+                    });
                 }
-            });
-            
-            return row;
+            }
         });
-        
-        tableCourriers.setItems(courriersVisibles);
-        
-        // Recherche
-        if (txtRechercherCourrier != null) {
-            txtRechercherCourrier.textProperty().addListener((obs, oldVal, newVal) -> {
-                filterTableCourriers(newVal);
-            });
-        }
-        
-        // Boutons actions
-        if (btnVoirSelectionne != null) {
-            btnVoirSelectionne.setOnAction(e -> {
-                CourrierVisuItem selected = tableCourriers.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    voirCourrierDetails(selected);
-                }
-            });
-        }
-        
-        if (btnCommenterSelectionne != null) {
-            btnCommenterSelectionne.setOnAction(e -> {
-                CourrierVisuItem selected = tableCourriers.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    ajouterCommentaire(selected);
-                }
-            });
-        }
+        return row;
+    }); // ← IMPORTANT: Fermer le setRowFactory (MANQUAIT DANS VOTRE CODE)
+    
+    tableCourriers.setItems(courriersVisibles);
+    
+    // Recherche
+    if (txtRechercherCourrier != null) {
+        txtRechercherCourrier.textProperty().addListener((obs, oldVal, newVal) -> {
+            filterTableCourriers(newVal);
+        });
     }
+    
+    // Boutons actions
+    if (btnVoirSelectionne != null) {
+        btnVoirSelectionne.setOnAction(e -> {
+            CourrierVisuItem selected = tableCourriers.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                voirCourrierDetails(selected);
+            }
+        });
+    }
+    
+    if (btnCommenterSelectionne != null) {
+        btnCommenterSelectionne.setOnAction(e -> {
+            CourrierVisuItem selected = tableCourriers.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ajouterCommentaire(selected);
+            }
+        });
+    }
+}
     
     /**
      * Crée les cellules d'actions pour la table
@@ -574,6 +588,48 @@ public class WorkflowSuiviController implements Initializable {
         if (btnExporter != null) {
             btnExporter.setOnAction(e -> exporterVisualization());
         }
+    }
+    
+    /**
+     * Adapte l'UI selon le mode sélectionné
+     */
+    private void adaptUIToMode() {
+        System.out.println("🔄 Changement de mode: " + modeActuel);
+        
+        // Adapter l'interface selon le mode
+        switch (modeActuel) {
+            case INDIVIDUEL:
+                tableauCourriersContainer.setVisible(true);
+                tableauCourriersContainer.setManaged(true);
+                cbPeriode.setDisable(false);
+                cbPriorite.setDisable(true);
+                break;
+                
+            case PAR_PRIORITE:
+                tableauCourriersContainer.setVisible(true);
+                tableauCourriersContainer.setManaged(true);
+                cbPriorite.setDisable(false);
+                break;
+                
+            case CONFIDENTIELS:
+                if (currentUser.getNiveauAutorite() != 0) {
+                    AlertUtils.showWarning("Accès refusé", 
+                        "Seuls les utilisateurs de niveau 0 peuvent voir les courriers confidentiels");
+                    
+                    cbModeVisualisation.setValue(new ModeVisualisationItem(ModeVisualisation.COLLECTIF_TOTAL));
+                    return;
+                }
+                tableauCourriersContainer.setVisible(true);
+                tableauCourriersContainer.setManaged(true);
+                break;
+                
+            default:
+                tableauCourriersContainer.setVisible(true);
+                tableauCourriersContainer.setManaged(true);
+                cbPriorite.setDisable(true);
+        }
+        
+        refreshVisualization();
     }
     
     // ═══════════════════════════════════════════════════════════════
@@ -895,7 +951,16 @@ public class WorkflowSuiviController implements Initializable {
             
             // Événement de clic sur l'arc
             arc.setOnArcClick(courrierIds -> {
-                showCourriersInArc(courrierIds, serviceSource, serviceDest);
+                // Ouvrir le dialogue enrichi avec tous les détails
+                ArcCourriersDialog dialog = new ArcCourriersDialog(
+                    courrierIds,
+                    serviceSource,
+                    serviceDest,
+                    courrierService,
+                    cotationService,
+                    workflowService
+                );
+                dialog.show();
             });
             
             graphPane.getChildren().add(arc);
@@ -1324,75 +1389,7 @@ public class WorkflowSuiviController implements Initializable {
     // ═══════════════════════════════════════════════════════════════
     // ÉVÉNEMENTS ET ACTIONS
     // ═══════════════════════════════════════════════════════════════
-    
-    /**
-     * Appelé quand le mode de visualisation change
-     */
-    private void onModeChanged() {
-        System.out.println("🔄 Changement de mode: " + modeActuel);
-        
-        // Adapter l'interface selon le mode
-        switch (modeActuel) {
-            case INDIVIDUEL:
-                tableauCourriersContainer.setVisible(true);
-                tableauCourriersContainer.setManaged(true);
-                cbPeriode.setDisable(false);
-                cbPriorite.setDisable(true);
-                break;
-                
-            case PAR_PRIORITE:
-                tableauCourriersContainer.setVisible(true);
-                tableauCourriersContainer.setManaged(true);
-                cbPriorite.setDisable(false);
-                break;
-                
-            case CONFIDENTIELS:
-                if (currentUser.getNiveauAutorite() != 0) {
-                    AlertUtils.showWarning("Accès refusé", 
-                        "Seuls les utilisateurs de niveau 0 peuvent voir les courriers confidentiels");
-                    
-                    cbModeVisualisation.setValue(new ModeVisualisationItem(ModeVisualisation.COLLECTIF_TOTAL));
-                    return;
-                }
-                tableauCourriersContainer.setVisible(true);
-                tableauCourriersContainer.setManaged(true);
-                break;
-                
-            default:
-                tableauCourriersContainer.setVisible(true);
-                tableauCourriersContainer.setManaged(true);
-                cbPriorite.setDisable(true);
-        }
-        
-        refreshVisualization();
-    }
-    
-    /**
-     * Affiche les courriers dans un arc
-     */
-    private void showCourriersInArc(List<Integer> courrierIds, String serviceSource, String serviceDest) {
-        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-        dialog.setTitle("Courriers dans le flux");
-        dialog.setHeaderText("Flux: " + getServiceName(serviceSource) + " → " + getServiceName(serviceDest));
-        
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(15));
-        
-        for (Integer courrierId : courrierIds) {
-            Courrier courrier = courrierService.getCourrierById(courrierId);
-            if (courrier != null) {
-                HBox courrierBox = createCourrierBox(courrier);
-                content.getChildren().add(courrierBox);
-            }
-        }
-        
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setMaxHeight(400);
-        
-        dialog.getDialogPane().setContent(scrollPane);
-        dialog.show();
-    }
+
     
     /**
      * Crée une box pour un courrier
@@ -1438,15 +1435,14 @@ public class WorkflowSuiviController implements Initializable {
         Button btnVoir = new Button("👁");
         btnVoir.setStyle("-fx-background-color: #3498db; -fx-text-fill: white;");
         btnVoir.setOnAction(e -> {
-            voirCourrierDetails(new CourrierVisuItem(
-                courrier.getId(),
-                courrier.getCodeCourrier(),
-                courrier.getObjet(),
-                courrier.getTypeCourrier(),
-                courrier.getPriorite(),
-                courrier.getStatut(),
-                0, 0, false, color
-            ));
+            Platform.runLater(() -> {
+                CourrierDetailDialog dialog = new CourrierDetailDialog(
+                    courrier,
+                    cotationService,
+                    workflowService
+                );
+                dialog.show();
+            });
         });
         
         Button btnComment = new Button("💬");
@@ -1528,18 +1524,23 @@ public class WorkflowSuiviController implements Initializable {
     private void voirCourrierDetails(CourrierVisuItem item) {
         System.out.println("👁 Voir détails courrier: " + item.getCodeCourrier());
         
-        // Si en mode individuel, redessiner le graphe pour ce courrier
-        if (modeActuel == ModeVisualisation.INDIVIDUEL) {
-            clearGraph();
-            
-            Courrier courrier = courrierService.getCourrierById(item.getCourrierId());
-            if (courrier != null) {
-                drawIndividualCourrierGraph(courrier);
-            }
-        } else {
-            // Sinon, ouvrir une fenêtre de détails
-            openCourrierDetailsDialog(item);
+        // Récupérer le courrier complet
+        Courrier courrier = courrierService.getCourrierById(item.getCourrierId());
+        
+        if (courrier == null) {
+            AlertUtils.showError("Erreur", "Courrier introuvable");
+            return;
         }
+        
+        // Ouvrir le dialogue enrichi avec tous les détails
+        Platform.runLater(() -> {
+            CourrierDetailDialog dialog = new CourrierDetailDialog(
+                courrier,
+                cotationService,
+                workflowService
+            );
+            dialog.show();
+        });
     }
     
     /**
@@ -1557,6 +1558,44 @@ public class WorkflowSuiviController implements Initializable {
             showEmptyGraphMessage();
             return;
         }
+        
+     // Créer en-tête avec bouton détails
+        VBox headerBox = new VBox(10);
+        headerBox.setLayoutX(50);
+        headerBox.setLayoutY(50);
+        headerBox.setPadding(new Insets(15));
+        headerBox.setStyle("-fx-background-color: white; -fx-background-radius: 10; " +
+                          "-fx-border-color: #3498db; -fx-border-width: 2; -fx-border-radius: 10;");
+        
+        Label titreLabel = new Label("📨 " + courrier.getCodeCourrier());
+        titreLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
+        
+        Label objetLabel = new Label(courrier.getObjet());
+        objetLabel.setWrapText(true);
+        objetLabel.setMaxWidth(800);
+        objetLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        
+        Button btnDetails = new Button("📋 Voir Détails Complets");
+        btnDetails.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; " +
+                           "-fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 5;");
+        btnDetails.setCursor(Cursor.HAND);
+        btnDetails.setOnAction(e -> {
+            Platform.runLater(() -> {
+                CourrierDetailDialog dialog = new CourrierDetailDialog(
+                    courrier,
+                    cotationService,
+                    workflowService
+                );
+                dialog.show();
+            });
+        });
+        
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.getChildren().add(btnDetails);
+        
+        headerBox.getChildren().addAll(titreLabel, objetLabel, buttonBox);
+        graphPane.getChildren().add(headerBox);
         
         // Disposition horizontale
         double startX = 150;
@@ -1586,6 +1625,14 @@ public class WorkflowSuiviController implements Initializable {
         
         System.out.println("✅ Parcours individuel dessiné: " + evenements.size() + " événements");
     }
+    
+    /**
+    * Récupère un objet Courrier à partir d'un CourrierVisuItem
+    */
+   private Courrier getCourrierFromItem(CourrierVisuItem item) {
+       if (item == null) return null;
+       return courrierService.getCourrierById(item.getCourrierId());
+   }
     
     /**
      * Crée un nœud pour un événement
@@ -1763,28 +1810,6 @@ public class WorkflowSuiviController implements Initializable {
         graphPane.getChildren().add(connectionGroup);
     }
     
-    /**
-     * Ouvre une fenêtre de détails pour un courrier
-     */
-    private void openCourrierDetailsDialog(CourrierVisuItem item) {
-        // À implémenter : fenêtre popup avec détails complets
-        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-        dialog.setTitle("Détails du Courrier");
-        dialog.setHeaderText(item.getCodeCourrier());
-        
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(15));
-        
-        content.getChildren().add(new Label("Objet: " + item.getObjet()));
-        content.getChildren().add(new Label("Type: " + item.getTypeLibelle()));
-        content.getChildren().add(new Label("Priorité: " + item.getPrioriteLibelle()));
-        content.getChildren().add(new Label("Statut: " + item.getStatutLibelle()));
-        content.getChildren().add(new Label("Étapes: " + item.getNbEtapes()));
-        content.getChildren().add(new Label("Durée: " + item.getDureeFormatee()));
-        
-        dialog.getDialogPane().setContent(content);
-        dialog.show();
-    }
     
     /**
      * Ajoute un commentaire à un courrier
