@@ -8,6 +8,8 @@ import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.Group;
+import javafx.scene.transform.Scale;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
@@ -418,330 +420,479 @@ public class AdminHierarchyController implements Initializable {
     @FXML
     private void handleShowVisualization() {
         try {
-            // Créer une nouvelle fenêtre modale
-            Stage visualizationStage = new Stage();
-            visualizationStage.initModality(Modality.APPLICATION_MODAL);
-            visualizationStage.setTitle("📊 Visualisation de la Structure Hiérarchique");
-            
-            // ═══════════════════════════════════════════════════════════════
-            // CRÉATION DU CONTENEUR PRINCIPAL
-            // ═══════════════════════════════════════════════════════════════
-            
-            BorderPane root = new BorderPane();
-            root.setStyle("-fx-background-color: #f5f5f5;");
-            
-            // ═══════════════════════════════════════════════════════════════
-            // BARRE D'OUTILS DE ZOOM (EN HAUT)
-            // ═══════════════════════════════════════════════════════════════
-            
-            HBox toolBar = new HBox(15);
-            toolBar.setPadding(new Insets(10));
-            toolBar.setAlignment(Pos.CENTER);
-            toolBar.setStyle("-fx-background-color: white; -fx-border-color: #ddd; " +
-                           "-fx-border-width: 0 0 1 0;");
-            
-            // Bouton Zoom In
-            Button btnZoomIn = new Button("🔍+ Zoom In");
-            btnZoomIn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; " +
-                             "-fx-font-weight: bold; -fx-cursor: hand;");
-            
-            // Bouton Zoom Out
-            Button btnZoomOut = new Button("🔍- Zoom Out");
-            btnZoomOut.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; " +
-                              "-fx-font-weight: bold; -fx-cursor: hand;");
-            
-            // Bouton Reset
-            Button btnResetZoom = new Button("↻ Reset (100%)");
-            btnResetZoom.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; " +
-                                "-fx-font-weight: bold; -fx-cursor: hand;");
-            
-            // Slider de zoom
-            Slider zoomSlider = new Slider(0.25, 2.0, 1.0);
-            zoomSlider.setShowTickLabels(false);
-            zoomSlider.setShowTickMarks(true);
-            zoomSlider.setMajorTickUnit(0.25);
-            zoomSlider.setMinorTickCount(0);
-            zoomSlider.setPrefWidth(200);
-            zoomSlider.setStyle("-fx-cursor: hand;");
-            
-            // Label du niveau de zoom
-            Label zoomLabel = new Label("Zoom: 100%");
-            zoomLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; " +
-                             "-fx-text-fill: #2c3e50;");
-            
-            // Séparateur
-            Separator sep1 = new Separator(Orientation.VERTICAL);
-            Separator sep2 = new Separator(Orientation.VERTICAL);
-            
-            // Label d'aide
-            Label helpLabel = new Label("💡 Astuce: Ctrl + Molette pour zoomer");
-            helpLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d; " +
-                             "-fx-font-style: italic;");
-            
-            toolBar.getChildren().addAll(
-                btnZoomOut, btnZoomIn, btnResetZoom,
-                sep1,
-                new Label("Niveau:"), zoomSlider, zoomLabel,
-                sep2,
-                helpLabel
-            );
-            
-            // ═══════════════════════════════════════════════════════════════
-            // ZONE DE VISUALISATION AVEC SCROLLPANE
-            // ═══════════════════════════════════════════════════════════════
-            
-            ScrollPane scrollPane = new ScrollPane();
-            scrollPane.setFitToWidth(false);  // Important pour le zoom
-            scrollPane.setFitToHeight(false); // Important pour le zoom
-            scrollPane.setPannable(true);     // Permet de déplacer avec la souris
-            scrollPane.setStyle("-fx-background-color: #f5f5f5;");
-            
-            // Pane conteneur pour l'organigramme (celui qu'on va zoomer)
-            VBox organigrammeContainer = createOrganigramme();
-            organigrammeContainer.setStyle("-fx-background-color: #f5f5f5; " +
-                                          "-fx-padding: 50;");
-            
-            // Wrapper pour centrer l'organigramme
-            StackPane wrapper = new StackPane(organigrammeContainer);
-            wrapper.setStyle("-fx-background-color: #f5f5f5;");
-            wrapper.setMinWidth(1500);  // Largeur minimale pour éviter le collapse
-            wrapper.setMinHeight(1000); // Hauteur minimale
-            
-            scrollPane.setContent(wrapper);
-            
-            // ═══════════════════════════════════════════════════════════════
-            // BARRE D'INFORMATIONS (EN BAS)
-            // ═══════════════════════════════════════════════════════════════
-            
-            HBox infoBar = new HBox(20);
-            infoBar.setPadding(new Insets(10));
-            infoBar.setAlignment(Pos.CENTER);
-            infoBar.setStyle("-fx-background-color: white; -fx-border-color: #ddd; " +
-                           "-fx-border-width: 1 0 0 0;");
-            
-            int totalServices = workflowService.getAllServices().size();
-            Label infoLabel = new Label("📦 Total de services: " + totalServices);
-            infoLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
-            
-            Button btnExport = new Button("💾 Exporter (PNG)");
-            btnExport.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; " +
-                             "-fx-cursor: hand;");
-            btnExport.setOnAction(e -> {
-                AlertUtils.showInfo("Fonctionnalité d'export en cours de développement");
-            });
-            
-            Button btnClose = new Button("✖ Fermer");
-            btnClose.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; " +
-                            "-fx-cursor: hand;");
-            btnClose.setOnAction(e -> visualizationStage.close());
-            
-            infoBar.getChildren().addAll(infoLabel, btnExport, btnClose);
-            
-            // ═══════════════════════════════════════════════════════════════
-            // LOGIQUE DE ZOOM
-            // ═══════════════════════════════════════════════════════════════
-            
-            // Fonction pour appliquer le zoom
-            Consumer<Double> applyZoom = (zoomLevel) -> {
-                // Appliquer la transformation Scale
-                organigrammeContainer.setScaleX(zoomLevel);
-                organigrammeContainer.setScaleY(zoomLevel);
-                
-                // Mettre à jour le label
-                zoomLabel.setText(String.format("Zoom: %.0f%%", zoomLevel * 100));
-                
-                // Mettre à jour le slider
-                zoomSlider.setValue(zoomLevel);
-                
-                // Ajuster la taille du wrapper pour éviter le clipping
-                double newWidth = 1500 * zoomLevel;
-                double newHeight = 1000 * zoomLevel;
-                wrapper.setMinWidth(newWidth);
-                wrapper.setMinHeight(newHeight);
-            };
-            
-            // Bouton Zoom In (+25%)
-            btnZoomIn.setOnAction(e -> {
-                double currentZoom = zoomSlider.getValue();
-                double newZoom = Math.min(currentZoom + 0.25, 2.0);
-                applyZoom.accept(newZoom);
-            });
-            
-            // Bouton Zoom Out (-25%)
-            btnZoomOut.setOnAction(e -> {
-                double currentZoom = zoomSlider.getValue();
-                double newZoom = Math.max(currentZoom - 0.25, 0.25);
-                applyZoom.accept(newZoom);
-            });
-            
-            // Bouton Reset (100%)
-            btnResetZoom.setOnAction(e -> applyZoom.accept(1.0));
-            
-            // Slider de zoom
-            zoomSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-                applyZoom.accept(newVal.doubleValue());
-            });
-            
-            // Zoom avec la molette de la souris (Ctrl + Scroll)
-            scrollPane.setOnScroll(event -> {
-                if (event.isControlDown()) {
-                    event.consume(); // Empêcher le scroll normal
-                    
-                    double currentZoom = zoomSlider.getValue();
-                    double delta = event.getDeltaY() > 0 ? 0.1 : -0.1;
-                    double newZoom = Math.max(0.25, Math.min(2.0, currentZoom + delta));
-                    
-                    applyZoom.accept(newZoom);
-                }
-            });
-            
-            // ═══════════════════════════════════════════════════════════════
-            // ASSEMBLAGE ET AFFICHAGE
-            // ═══════════════════════════════════════════════════════════════
-            
-            root.setTop(toolBar);
-            root.setCenter(scrollPane);
-            root.setBottom(infoBar);
-            
-            Scene scene = new Scene(root, 1400, 900);
-            visualizationStage.setScene(scene);
-            visualizationStage.setMaximized(false);
-            
-            // Afficher la fenêtre
-            visualizationStage.show();
-            
+            new OrganigrammeView().show();
         } catch (Exception e) {
             System.err.println("Erreur lors de la visualisation: " + e.getMessage());
             e.printStackTrace();
             AlertUtils.showError("Impossible d'afficher la visualisation");
         }
     }
-    
+
     /**
-     * NOUVEAU: Crée une représentation graphique de l'organigramme
+     * Vue interactive de l'organigramme.
+     *
+     * Rendu en positionnement absolu (Pane + connecteurs dessinés) afin d'obtenir
+     * un espacement lisible et professionnel — corrige l'affichage « resserré ».
+     *
+     * Fonctionnalités :
+     *  - zoom (boutons, curseur, molette Ctrl, « Ajuster à la fenêtre ») et déplacement (pan) ;
+     *  - repli / dépli des branches (badge « N sous-services » cliquable) ;
+     *  - « Tout déplier » / « Tout replier » ;
+     *  - recherche instantanée avec surbrillance et estompage des cartes non concernées ;
+     *  - clic sur une carte : mise en évidence de toute la lignée (jusqu'à la racine) ;
+     *  - infobulle détaillée par service et légende des niveaux.
+     *
+     * Cette classe est autonome et ne modifie pas la logique métier existante.
      */
-    private VBox createOrganigramme() {
-        VBox container = new VBox(30);
-        container.setPadding(new Insets(40));
-        container.setAlignment(Pos.TOP_CENTER);
-        container.setStyle("-fx-background-color: #f8f9fa;");
-        
-        // Titre
-        Label titre = new Label("📊 ORGANIGRAMME HIÉRARCHIQUE");
-        titre.setFont(Font.font("System", FontWeight.BOLD, 24));
-        titre.setStyle("-fx-text-fill: #2c3e50;");
-        container.getChildren().add(titre);
-        
-        // Récupérer les services racines
-        List<ServiceHierarchy> rootServices = workflowService.getRootServices();
-        
-        // Créer une visualisation pour chaque branche
-        for (ServiceHierarchy root : rootServices) {
-            VBox branche = createBrancheVisuelle(root, 0);
-            container.getChildren().add(branche);
-            
-            // Ajouter un séparateur si ce n'est pas le dernier
-            if (rootServices.indexOf(root) < rootServices.size() - 1) {
-                Separator sep = new Separator();
-                sep.setPrefWidth(800);
-                container.getChildren().add(sep);
+    private class OrganigrammeView {
+
+        // --- Paramètres de mise en page (en pixels) ---
+        private final double CARD_W   = 210;  // largeur d'une carte
+        private final double CARD_H   = 104;  // hauteur d'une carte
+        private final double H_GAP    = 30;   // écart horizontal entre sous-arbres frères
+        private final double V_GAP    = 68;   // écart vertical entre niveaux
+        private final double PAD       = 70;  // marge autour de l'organigramme
+        private final double ROOT_GAP  = 80;  // écart entre deux arbres racines
+
+        // --- État de la vue ---
+        private final Set<String> collapsed = new HashSet<>();
+        private String selectedCode = null;
+        private String searchQuery = "";
+        private double zoom = 1.0;
+
+        // --- Résultats de calcul de disposition (recalculés à chaque rendu) ---
+        private final Map<String, Double> width = new HashMap<>();
+        private final Map<String, Double> centerX = new HashMap<>();
+        private final Map<String, Double> topY = new HashMap<>();
+        private double totalW = 0, totalH = 0;
+        private int maxDepth = 0;
+
+        // --- Composants graphiques ---
+        private final Pane canvas = new Pane();
+        private final Scale scaleTx = new Scale(1, 1, 0, 0); // zoom ancré en haut-gauche
+        private ScrollPane scrollPane;
+        private Label zoomLabel;
+        private Slider zoomSlider;
+        private TextField searchField;
+
+        // ────────────────────────────────────────────────────────────────
+        // Fenêtre
+        // ────────────────────────────────────────────────────────────────
+        void show() {
+            Stage stage = new Stage();
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setTitle("Organigramme — Structure hiérarchique des services");
+
+            BorderPane root = new BorderPane();
+            root.setStyle("-fx-background-color:#eef1f5;");
+            root.setTop(buildToolbar(stage));
+
+            canvas.setStyle("-fx-background-color:transparent;");
+            canvas.getTransforms().add(scaleTx);
+
+            // Un Group répercute les bornes transformées (zoom) au ScrollPane :
+            // les barres de défilement restent correctes quel que soit le zoom.
+            Group zoomGroup = new Group(canvas);
+            scrollPane = new ScrollPane(zoomGroup);
+            scrollPane.setPannable(true);
+            scrollPane.setStyle("-fx-background:#eef1f5; -fx-background-color:#eef1f5; -fx-border-color:transparent;");
+            scrollPane.setOnScroll(ev -> {
+                if (ev.isControlDown()) {
+                    ev.consume();
+                    setZoom(zoom + (ev.getDeltaY() > 0 ? 0.1 : -0.1));
+                }
+            });
+            root.setCenter(scrollPane);
+            root.setBottom(buildLegendBar());
+
+            render();
+
+            Scene scene = new Scene(root, 1280, 860);
+            stage.setScene(scene);
+            stage.show();
+
+            // Ajustement automatique une fois la fenêtre dimensionnée
+            javafx.application.Platform.runLater(this::fitToWindow);
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Barre d'outils (haut)
+        // ────────────────────────────────────────────────────────────────
+        private HBox buildToolbar(Stage stage) {
+            HBox bar = new HBox(10);
+            bar.setPadding(new Insets(12, 16, 12, 16));
+            bar.setAlignment(Pos.CENTER_LEFT);
+            bar.setStyle("-fx-background-color:white; -fx-border-color:#d9dee6; -fx-border-width:0 0 1 0;");
+
+            Label title = new Label("Organigramme des services");
+            title.setStyle("-fx-font-size:16px; -fx-font-weight:bold; -fx-text-fill:#2c3e50;");
+
+            searchField = new TextField();
+            searchField.setPromptText("Rechercher (code ou nom)…");
+            searchField.setPrefWidth(220);
+            searchField.textProperty().addListener((o, ov, nv) -> {
+                searchQuery = (nv == null) ? "" : nv.trim().toLowerCase();
+                render();
+            });
+
+            Button btnExpand = pill("Tout déplier", "#3498db");
+            btnExpand.setOnAction(e -> { collapsed.clear(); render(); });
+            Button btnCollapse = pill("Tout replier", "#7f8c8d");
+            btnCollapse.setOnAction(e -> { collapseAll(); render(); });
+
+            Button btnFit = pill("Ajuster", "#16a085");
+            btnFit.setOnAction(e -> fitToWindow());
+            Button btnZoomOut = pill("−", "#95a5a6");
+            btnZoomOut.setOnAction(e -> setZoom(zoom - 0.1));
+            Button btnZoomIn = pill("+", "#2980b9");
+            btnZoomIn.setOnAction(e -> setZoom(zoom + 0.1));
+            Button btnReset = pill("100 %", "#e67e22");
+            btnReset.setOnAction(e -> setZoom(1.0));
+
+            zoomSlider = new Slider(0.3, 2.0, 1.0);
+            zoomSlider.setPrefWidth(140);
+            zoomSlider.valueProperty().addListener((o, ov, nv) -> {
+                if (Math.abs(nv.doubleValue() - zoom) > 0.001) setZoom(nv.doubleValue());
+            });
+            zoomLabel = new Label("100 %");
+            zoomLabel.setStyle("-fx-font-weight:bold; -fx-text-fill:#2c3e50; -fx-min-width:44px;");
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button btnClose = pill("Fermer", "#c0392b");
+            btnClose.setOnAction(e -> stage.close());
+
+            bar.getChildren().addAll(
+                title, new Separator(Orientation.VERTICAL), searchField,
+                btnExpand, btnCollapse, new Separator(Orientation.VERTICAL),
+                btnFit, btnZoomOut, zoomSlider, btnZoomIn, zoomLabel, btnReset,
+                spacer, btnClose
+            );
+            return bar;
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Légende (bas)
+        // ────────────────────────────────────────────────────────────────
+        private HBox buildLegendBar() {
+            HBox bar = new HBox(16);
+            bar.setPadding(new Insets(10, 16, 10, 16));
+            bar.setAlignment(Pos.CENTER_LEFT);
+            bar.setStyle("-fx-background-color:white; -fx-border-color:#d9dee6; -fx-border-width:1 0 0 0;");
+
+            Label lg = new Label("Légende :");
+            lg.setStyle("-fx-font-weight:bold; -fx-text-fill:#2c3e50;");
+            bar.getChildren().add(lg);
+
+            int[] niveaux = {-1, 0, 1, 2, 3, 4, 5};
+            String[] libelles = {
+                "Courrier", "Direction", "Major Général", "Sous-directions",
+                "Cellules", "Chefs d'équipe", "Adjoints"
+            };
+            Set<Integer> present = new HashSet<>();
+            for (ServiceHierarchy s : workflowService.getAllServices()) {
+                present.add(s.getNiveau());
+            }
+            for (int i = 0; i < niveaux.length; i++) {
+                if (!present.contains(niveaux[i])) continue;
+                HBox item = new HBox(6);
+                item.setAlignment(Pos.CENTER_LEFT);
+                Region sw = new Region();
+                sw.setMinSize(16, 16);
+                sw.setPrefSize(16, 16);
+                sw.setStyle("-fx-background-color:" + getBackgroundColorForLevel(niveaux[i]) + ";"
+                          + "-fx-border-color:#95a5a6; -fx-border-radius:3; -fx-background-radius:3;");
+                Label lb = new Label("N" + niveaux[i] + " · " + libelles[i]);
+                lb.setStyle("-fx-font-size:11px; -fx-text-fill:#5d6d7e;");
+                item.getChildren().addAll(sw, lb);
+                bar.getChildren().add(item);
+            }
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Label hint = new Label("Ctrl + molette : zoom · glisser : déplacer · clic sur une carte : afficher la lignée");
+            hint.setStyle("-fx-font-size:11px; -fx-font-style:italic; -fx-text-fill:#95a5a6;");
+            bar.getChildren().addAll(spacer, hint);
+            return bar;
+        }
+
+        private Button pill(String text, String color) {
+            Button b = new Button(text);
+            b.setStyle("-fx-background-color:" + color + "; -fx-text-fill:white; -fx-font-weight:bold; "
+                     + "-fx-background-radius:6; -fx-cursor:hand; -fx-padding:6 12 6 12;");
+            return b;
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Zoom / ajustement
+        // ────────────────────────────────────────────────────────────────
+        private void setZoom(double z) {
+            zoom = Math.max(0.3, Math.min(2.0, z));
+            scaleTx.setX(zoom);
+            scaleTx.setY(zoom);
+            if (zoomLabel != null) zoomLabel.setText(String.format("%.0f %%", zoom * 100));
+            if (zoomSlider != null && Math.abs(zoomSlider.getValue() - zoom) > 0.001) {
+                zoomSlider.setValue(zoom);
             }
         }
-        
-        return container;
-    }
-    
-    /**
-     * NOUVEAU: Crée une branche visuelle de l'organigramme
-     */
-    private VBox createBrancheVisuelle(ServiceHierarchy service, int profondeur) {
-        VBox branche = new VBox(15);
-        branche.setAlignment(Pos.TOP_CENTER);
-        
-        // Créer la carte du service
-        VBox serviceCard = createServiceCard(service);
-        branche.getChildren().add(serviceCard);
-        
-        // Si le service a des enfants, créer leurs branches
-        List<ServiceHierarchy> enfants = service.getEnfants();
-        if (!enfants.isEmpty()) {
-            // Ligne de connexion
-            Line connector = new Line();
-            connector.setStartX(0);
-            connector.setStartY(0);
-            connector.setEndX(0);
-            connector.setEndY(20);
-            connector.setStroke(Color.web("#95a5a6"));
-            connector.setStrokeWidth(2);
-            branche.getChildren().add(connector);
-            
-            // Conteneur pour les enfants (horizontal)
-            HBox enfantsContainer = new HBox(20);
-            enfantsContainer.setAlignment(Pos.TOP_CENTER);
-            
-            for (ServiceHierarchy enfant : enfants) {
-                VBox brancheEnfant = createBrancheVisuelle(enfant, profondeur + 1);
-                enfantsContainer.getChildren().add(brancheEnfant);
+
+        private void fitToWindow() {
+            if (scrollPane == null) return;
+            double vw = scrollPane.getViewportBounds().getWidth();
+            double vh = scrollPane.getViewportBounds().getHeight();
+            if (vw <= 0 || vh <= 0 || totalW <= 0 || totalH <= 0) return;
+            double z = Math.min(vw / totalW, vh / totalH);
+            z = Math.max(0.3, Math.min(1.0, z)); // ne pas sur-agrandir au-delà de 100 %
+            setZoom(z);
+        }
+
+        private void collapseAll() {
+            collapsed.clear();
+            for (ServiceHierarchy s : workflowService.getAllServices()) {
+                if (!s.getEnfants().isEmpty()) collapsed.add(s.getServiceCode());
             }
-            
-            branche.getChildren().add(enfantsContainer);
+            // Garder les racines dépliées pour un rendu lisible
+            for (ServiceHierarchy r : workflowService.getRootServices()) {
+                collapsed.remove(r.getServiceCode());
+            }
         }
-        
-        return branche;
-    }
-    
-    /**
-     * NOUVEAU: Crée une carte visuelle pour un service
-     */
-    private VBox createServiceCard(ServiceHierarchy service) {
-        VBox card = new VBox(8);
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(15));
-        card.setMaxWidth(200);
-        card.setMinWidth(200);
-        
-        // Style selon le niveau
-        String backgroundColor = getBackgroundColorForLevel(service.getNiveau());
-        card.setStyle(
-            "-fx-background-color: " + backgroundColor + ";" +
-            "-fx-background-radius: 10;" +
-            "-fx-border-color: " + service.getCouleur() + ";" +
-            "-fx-border-width: 3;" +
-            "-fx-border-radius: 10;" +
-            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 10, 0, 0, 2);"
-        );
-        
-        // Icône et nom
-        Label icon = new Label(service.getIcone());
-        icon.setFont(Font.font(32));
-        
-        Label code = new Label(service.getServiceCode());
-        code.setFont(Font.font("System", FontWeight.BOLD, 14));
-        code.setStyle("-fx-text-fill: #2c3e50;");
-        
-        Label name = new Label(service.getServiceName());
-        name.setWrapText(true);
-        name.setMaxWidth(180);
-        name.setAlignment(Pos.CENTER);
-        name.setFont(Font.font(11));
-        name.setStyle("-fx-text-fill: #34495e;");
-        
-        Label niveau = new Label("Niveau " + service.getNiveau());
-        niveau.setFont(Font.font(10));
-        niveau.setStyle("-fx-text-fill: #7f8c8d;");
-        
-        card.getChildren().addAll(icon, code, name, niveau);
-        
-        // Indiquer si inactif
-        if (!service.isActif()) {
-            Label inactif = new Label("❌ INACTIF");
-            inactif.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
-            card.getChildren().add(inactif);
+
+        // ────────────────────────────────────────────────────────────────
+        // Rendu
+        // ────────────────────────────────────────────────────────────────
+        private void render() {
+            computeLayout();
+            canvas.getChildren().clear();
+            canvas.setMinSize(totalW, totalH);
+            canvas.setPrefSize(totalW, totalH);
+            canvas.setMaxSize(totalW, totalH);
+
+            // Lignée mise en évidence (service sélectionné + ancêtres)
+            Set<String> lineage = new HashSet<>();
+            if (selectedCode != null) {
+                ServiceHierarchy s = workflowService.getServiceByCode(selectedCode);
+                while (s != null) {
+                    lineage.add(s.getServiceCode());
+                    s = s.getParent();
+                }
+            }
+
+            // Connecteurs d'abord (en dessous), puis cartes (au-dessus)
+            for (ServiceHierarchy r : workflowService.getRootServices()) drawConnectors(r, lineage);
+            for (ServiceHierarchy r : workflowService.getRootServices()) drawCards(r, lineage);
         }
-        
-        return card;
+
+        private List<ServiceHierarchy> visibleChildren(ServiceHierarchy s) {
+            if (collapsed.contains(s.getServiceCode())) return java.util.Collections.emptyList();
+            return s.getEnfants();
+        }
+
+        private void computeLayout() {
+            width.clear();
+            centerX.clear();
+            topY.clear();
+            maxDepth = 0;
+
+            List<ServiceHierarchy> roots = workflowService.getRootServices();
+            for (ServiceHierarchy r : roots) computeWidth(r);
+
+            double left = PAD;
+            for (ServiceHierarchy r : roots) {
+                assign(r, left, 0);
+                left += width.get(r.getServiceCode()) + ROOT_GAP;
+            }
+
+            totalW = roots.isEmpty() ? (2 * PAD) : (left - ROOT_GAP + PAD);
+            totalH = PAD + (maxDepth + 1) * (CARD_H + V_GAP) - V_GAP + PAD;
+        }
+
+        private double computeWidth(ServiceHierarchy s) {
+            List<ServiceHierarchy> kids = visibleChildren(s);
+            double w;
+            if (kids.isEmpty()) {
+                w = CARD_W;
+            } else {
+                double sum = 0;
+                for (ServiceHierarchy k : kids) sum += computeWidth(k);
+                sum += H_GAP * (kids.size() - 1);
+                w = Math.max(CARD_W, sum);
+            }
+            width.put(s.getServiceCode(), w);
+            return w;
+        }
+
+        private void assign(ServiceHierarchy s, double leftX, int depth) {
+            maxDepth = Math.max(maxDepth, depth);
+            String code = s.getServiceCode();
+            double w = width.get(code);
+            topY.put(code, PAD + depth * (CARD_H + V_GAP));
+
+            List<ServiceHierarchy> kids = visibleChildren(s);
+            if (kids.isEmpty()) {
+                centerX.put(code, leftX + w / 2);
+                return;
+            }
+
+            double childrenTotal = 0;
+            for (ServiceHierarchy k : kids) childrenTotal += width.get(k.getServiceCode());
+            childrenTotal += H_GAP * (kids.size() - 1);
+
+            double childLeft = leftX + (w - childrenTotal) / 2;
+            double firstCx = 0, lastCx = 0;
+            for (int i = 0; i < kids.size(); i++) {
+                ServiceHierarchy k = kids.get(i);
+                assign(k, childLeft, depth + 1);
+                double kcx = centerX.get(k.getServiceCode());
+                if (i == 0) firstCx = kcx;
+                if (i == kids.size() - 1) lastCx = kcx;
+                childLeft += width.get(k.getServiceCode()) + H_GAP;
+            }
+            centerX.put(code, (firstCx + lastCx) / 2);
+        }
+
+        private void drawConnectors(ServiceHierarchy s, Set<String> lineage) {
+            List<ServiceHierarchy> kids = visibleChildren(s);
+            if (!kids.isEmpty()) {
+                double pcx = centerX.get(s.getServiceCode());
+                double pBottom = topY.get(s.getServiceCode()) + CARD_H;
+                double busY = pBottom + V_GAP / 2;
+                boolean parentInLineage = lineage.contains(s.getServiceCode());
+
+                // Segment vertical parent → bus
+                addLine(pcx, pBottom, pcx, busY, parentInLineage && anyChildInLineage(kids, lineage));
+
+                // Barre horizontale reliant les enfants
+                double minX = pcx, maxX = pcx;
+                for (ServiceHierarchy k : kids) {
+                    double kcx = centerX.get(k.getServiceCode());
+                    minX = Math.min(minX, kcx);
+                    maxX = Math.max(maxX, kcx);
+                }
+                addLine(minX, busY, maxX, busY, false);
+
+                // Bus → chaque enfant
+                for (ServiceHierarchy k : kids) {
+                    double kcx = centerX.get(k.getServiceCode());
+                    double kTop = topY.get(k.getServiceCode());
+                    boolean edgeHi = parentInLineage && lineage.contains(k.getServiceCode());
+                    addLine(kcx, busY, kcx, kTop, edgeHi);
+                }
+            }
+            for (ServiceHierarchy k : kids) drawConnectors(k, lineage);
+        }
+
+        private boolean anyChildInLineage(List<ServiceHierarchy> kids, Set<String> lineage) {
+            for (ServiceHierarchy k : kids) {
+                if (lineage.contains(k.getServiceCode())) return true;
+            }
+            return false;
+        }
+
+        private void addLine(double x1, double y1, double x2, double y2, boolean highlight) {
+            Line ln = new Line(x1, y1, x2, y2);
+            if (highlight) {
+                ln.setStroke(Color.web("#e67e22"));
+                ln.setStrokeWidth(3);
+            } else {
+                ln.setStroke(Color.web("#b0bac5"));
+                ln.setStrokeWidth(1.6);
+            }
+            canvas.getChildren().add(ln);
+        }
+
+        private void drawCards(ServiceHierarchy s, Set<String> lineage) {
+            Region card = buildCard(s, lineage);
+            card.setLayoutX(centerX.get(s.getServiceCode()) - CARD_W / 2);
+            card.setLayoutY(topY.get(s.getServiceCode()));
+            canvas.getChildren().add(card);
+            for (ServiceHierarchy k : visibleChildren(s)) drawCards(k, lineage);
+        }
+
+        private Region buildCard(ServiceHierarchy s, Set<String> lineage) {
+            VBox card = new VBox(4);
+            card.setAlignment(Pos.CENTER);
+            card.setPrefSize(CARD_W, CARD_H);
+            card.setMinSize(CARD_W, CARD_H);
+            card.setMaxSize(CARD_W, CARD_H);
+            card.setPadding(new Insets(10, 12, 10, 12));
+
+            String bg = getBackgroundColorForLevel(s.getNiveau());
+            String accent = s.getCouleur();
+            boolean isSelected = s.getServiceCode().equals(selectedCode);
+            boolean inLineage = lineage.contains(s.getServiceCode());
+            boolean matches = !searchQuery.isEmpty()
+                && (s.getServiceCode().toLowerCase().contains(searchQuery)
+                    || (s.getServiceName() != null && s.getServiceName().toLowerCase().contains(searchQuery)));
+            boolean dimmed = !searchQuery.isEmpty() && !matches;
+
+            String border = matches ? "#f1c40f" : ((isSelected || inLineage) ? "#e67e22" : accent);
+            double borderW = (matches || isSelected) ? 3.5 : (inLineage ? 3 : 2);
+
+            String base = "-fx-background-color:" + bg + ";"
+                + "-fx-background-radius:12;"
+                + "-fx-border-color:" + border + ";"
+                + "-fx-border-width:" + borderW + ";"
+                + "-fx-border-radius:12;"
+                + "-fx-effect:dropshadow(gaussian, rgba(0,0,0,0.18), 8, 0, 0, 3);";
+            card.setStyle(base);
+            if (dimmed) card.setOpacity(0.35);
+
+            HBox header = new HBox(6);
+            header.setAlignment(Pos.CENTER);
+            Label icon = new Label(s.getIcone());
+            icon.setStyle("-fx-font-size:18px;");
+            Label code = new Label(s.getServiceCode());
+            code.setStyle("-fx-font-weight:bold; -fx-font-size:14px; -fx-text-fill:#2c3e50;");
+            header.getChildren().addAll(icon, code);
+
+            Label name = new Label(s.getServiceName());
+            name.setWrapText(true);
+            name.setMaxWidth(CARD_W - 24);
+            name.setAlignment(Pos.CENTER);
+            name.setStyle("-fx-font-size:11px; -fx-text-fill:#34495e; -fx-text-alignment:center;");
+
+            card.getChildren().addAll(header, name);
+
+            int nb = s.getEnfants().size();
+            if (nb > 0) {
+                boolean isCollapsed = collapsed.contains(s.getServiceCode());
+                Label toggle = new Label(
+                    (isCollapsed ? "▸ " : "▾ ") + nb + (nb > 1 ? " sous-services" : " sous-service"));
+                toggle.setStyle("-fx-font-size:10px; -fx-font-weight:bold; -fx-text-fill:white; "
+                    + "-fx-background-color:" + accent + "; -fx-background-radius:10; "
+                    + "-fx-padding:2 8 2 8; -fx-cursor:hand;");
+                toggle.setOnMouseClicked(ev -> {
+                    ev.consume(); // ne pas déclencher la sélection de la carte
+                    if (collapsed.contains(s.getServiceCode())) collapsed.remove(s.getServiceCode());
+                    else collapsed.add(s.getServiceCode());
+                    render();
+                });
+                card.getChildren().add(toggle);
+            }
+
+            Tooltip tip = new Tooltip(
+                s.getServiceName() + " (" + s.getServiceCode() + ")\n"
+                + "Niveau : " + s.getNiveau() + "\n"
+                + "Parent : " + (s.getParent() != null ? s.getParent().getServiceCode() : "—") + "\n"
+                + "Sous-services : " + nb + " · Descendants : " + s.getNombreDescendants());
+            tip.setShowDelay(javafx.util.Duration.millis(250));
+            Tooltip.install(card, tip);
+
+            card.setOnMouseEntered(ev -> card.setStyle(base
+                + "-fx-effect:dropshadow(gaussian, rgba(0,0,0,0.28), 14, 0, 0, 5);"
+                + "-fx-scale-x:1.03; -fx-scale-y:1.03;"));
+            card.setOnMouseExited(ev -> card.setStyle(base));
+
+            card.setOnMouseClicked(ev -> {
+                selectedCode = s.getServiceCode().equals(selectedCode) ? null : s.getServiceCode();
+                render();
+            });
+
+            return card;
+        }
     }
-    
+
     /**
      * Retourne une couleur de fond selon le niveau hiérarchique
      */

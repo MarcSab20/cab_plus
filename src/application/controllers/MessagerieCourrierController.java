@@ -282,6 +282,33 @@ public class MessagerieCourrierController implements Initializable {
         if (btnImprimer != null) btnImprimer.setOnAction(e -> handleImprimer());
         if (btnArchiver != null) btnArchiver.setOnAction(e -> handleArchiver());
         if (btnActualiser != null) btnActualiser.setOnAction(e -> handleActualiser());
+
+        // Adaptation des libellés selon le service de l'utilisateur connecté
+        adaptCotationLabels();
+    }
+
+    /**
+     * Indique si l'utilisateur connecté "vise" les courriers plutôt que de les "coter".
+     * C'est le cas pour le CSP (Chef de Service du Personnel) et le CSA
+     * (Chef Service Administratif), qui apposent un visa hiérarchique.
+     */
+    private boolean isViseur() {
+        String serviceCode = (currentUser != null) ? currentUser.getServiceCode() : null;
+        return "CSP".equalsIgnoreCase(serviceCode) || "CSA".equalsIgnoreCase(serviceCode);
+    }
+
+    /**
+     * Renomme dynamiquement les boutons de cotation en "viser" lorsque
+     * l'utilisateur connecté est le CSP ou le CSA. Le comportement (handlers)
+     * reste identique : seul le libellé change.
+     */
+    private void adaptCotationLabels() {
+        if (!isViseur()) {
+            return; // Libellés "Coter…" par défaut conservés pour tous les autres services
+        }
+        if (btnCoter != null)          btnCoter.setText("📌 Viser à quelqu'un");
+        if (btnCoterRapide != null)    btnCoterRapide.setText("📌 Viser à quelqu'un");
+        if (btnCoterSelection != null) btnCoterSelection.setText("📌 Viser la sélection");
     }
     
     /**

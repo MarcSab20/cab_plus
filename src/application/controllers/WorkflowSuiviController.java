@@ -164,7 +164,8 @@ public class WorkflowSuiviController implements Initializable {
         COLLECTIF_GROUPE("👥 Vue Collective Groupée", "Courriers selon hiérarchie"),
         INDIVIDUEL("🔍 Vue Individuelle", "Un courrier spécifique"),
         CONFIDENTIELS("🔒 Courriers Confidentiels", "Niveau 0 uniquement"),
-        PAR_PRIORITE("🎯 Vue par Priorité", "Filtrer par priorité");
+        PAR_PRIORITE("🎯 Vue par Priorité", "Filtrer par priorité"),
+        FILIATION("🌱 Filiation des Courriers", "Courriers ayant engendré d'autres courriers");
         
         private final String label;
         private final String description;
@@ -283,6 +284,7 @@ public class WorkflowSuiviController implements Initializable {
         modes.add(new ModeVisualisationItem(ModeVisualisation.COLLECTIF_GROUPE));
         modes.add(new ModeVisualisationItem(ModeVisualisation.INDIVIDUEL));
         modes.add(new ModeVisualisationItem(ModeVisualisation.PAR_PRIORITE));
+        modes.add(new ModeVisualisationItem(ModeVisualisation.FILIATION));
         
         // Mode confidentiels uniquement pour niveau 0
         if (currentUser.getNiveauAutorite() == 0) {
@@ -442,6 +444,24 @@ public class WorkflowSuiviController implements Initializable {
     }); // ← IMPORTANT: Fermer le setRowFactory (MANQUAIT DANS VOTRE CODE)
     
     tableCourriers.setItems(courriersVisibles);
+    
+    // Sélection : (dé)active les boutons et, en mode Individuel/Filiation,
+    // dessine le parcours du courrier sélectionné dans la zone graphe.
+    tableCourriers.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+        boolean none = (newSel == null);
+        if (btnVoirSelectionne != null) btnVoirSelectionne.setDisable(none);
+        if (btnCommenterSelectionne != null) btnCommenterSelectionne.setDisable(none);
+
+        if (!none && modeActuel == ModeVisualisation.INDIVIDUEL) {
+            Courrier courrier = courrierService.getCourrierById(newSel.getCourrierId());
+            if (courrier != null) {
+                clearGraph();
+                assignCourrierColors(java.util.Collections.singletonList(courrier));
+                drawIndividualCourrierGraph(courrier);
+                if (lblNbCourriers != null) lblNbCourriers.setText("1 courrier");
+            }
+        }
+    });
     
     // Recherche
     if (txtRechercherCourrier != null) {
@@ -744,9 +764,43 @@ public class WorkflowSuiviController implements Initializable {
             case PAR_PRIORITE:
                 courriers = filterCourriersParPriorite(allCourriers);
                 break;
+                
+            case FILIATION:
+                // Filiation : on ignore le filtre de période pour garantir un graphe
+                // complet, et on ne garde que les courriers impliqués (parents + enfants).
+                courriers = filterCourriersFiliation();
+                break;
         }
         
         return courriers;
+    }
+    
+    /**
+     * Sélectionne les courriers impliqués dans une filiation.
+     * Un courrier "enfant" a une référence égale au code d'un autre courrier ;
+     * le courrier référencé est alors son "parent".
+     */
+    private List<Courrier> filterCourriersFiliation() {
+        List<Courrier> tous = courrierService.getAllCourriers();
+        Set<String> codes = tous.stream()
+            .map(Courrier::getCodeCourrier)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        
+        Set<String> codesParents = tous.stream()
+            .map(Courrier::getReference)
+            .filter(ref -> ref != null && !ref.isBlank() && codes.contains(ref))
+            .collect(Collectors.toSet());
+        
+        return tous.stream()
+            .filter(c -> {
+                boolean estEnfant = c.getReference() != null
+                    && !c.getReference().isBlank()
+                    && codes.contains(c.getReference());
+                boolean estParent = codesParents.contains(c.getCodeCourrier());
+                return estEnfant || estParent;
+            })
+            .collect(Collectors.toList());
     }
     
     /**
@@ -862,7 +916,178 @@ public class WorkflowSuiviController implements Initializable {
                 // Sera généré lors de la sélection d'un courrier
                 showSelectCourrierMessage();
                 break;
+                
+            case FILIATION:
+                generateFiliationGraph(courriers);
+                break;
         }
+    }
+    
+    /**
+     * Génère un graphe de filiation : arbres parent → enfant(s) reliant les
+     * courriers qui ont donné naissance à d'autres courriers (via la référence).
+     */
+    private void generateFiliationGraph(List<Courrier> courriers) {
+        Map<String, Courrier> parCode = new HashMap<>();
+        for (Courrier c : courriers) {
+            if (c.getCodeCourrier() != null) parCode.put(c.getCodeCourrier(), c);
+        }
+        
+        // Arêtes parent -> enfant
+        Map<String, List<Courrier>> enfantsDe = new HashMap<>();
+        Set<String> aUnParent = new HashSet<>();
+        for (Courrier c : courriers) {
+            String ref = c.getReference();
+            if (ref != null && !ref.isBlank() && parCode.containsKey(ref)) {
+                enfantsDe.computeIfAbsent(ref, k -> new ArrayList<>()).add(c);
+                aUnParent.add(c.getCodeCourrier());
+            }
+        }
+        
+        if (enfantsDe.isEmpty()) {
+            showEmptyGraphMessage();
+            return;
+        }
+        
+        // Racines = courriers sans parent dans l'ensemble
+        List<Courrier> racines = courriers.stream()
+            .filter(c -> !aUnParent.contains(c.getCodeCourrier()))
+            .sorted(Comparator.comparing(Courrier::getCodeCourrier,
+                    Comparator.nullsLast(Comparator.naturalOrder())))
+            .collect(Collectors.toList());
+        
+        final double startX = 80;
+        final double startY = 80;
+        final double hSpacing = 320;   // profondeur (colonnes)
+        final double vSpacing = 130;   // lignes
+        int[] ligneCourante = {0};     // compteur de ligne partagé (feuilles)
+        
+        // Parcours en profondeur : place chaque nœud, empile les feuilles verticalement
+        for (Courrier racine : racines) {
+            placerFiliation(racine, 0, enfantsDe, parCode,
+                            startX, startY, hSpacing, vSpacing, ligneCourante);
+        }
+        
+        int nbLiens = enfantsDe.values().stream().mapToInt(List::size).sum();
+        System.out.println("✅ Graphe de filiation: " + racines.size() + " racine(s), " + nbLiens + " lien(s)");
+    }
+    
+    /**
+     * Place récursivement un courrier et ses enfants, et dessine les liens.
+     * Retourne la coordonnée Y (centre) attribuée au nœud courant.
+     */
+    private double placerFiliation(Courrier courrier, int profondeur,
+                                   Map<String, List<Courrier>> enfantsDe,
+                                   Map<String, Courrier> parCode,
+                                   double startX, double startY,
+                                   double hSpacing, double vSpacing,
+                                   int[] ligneCourante) {
+        double x = startX + profondeur * hSpacing;
+        List<Courrier> enfants = enfantsDe.getOrDefault(courrier.getCodeCourrier(), Collections.emptyList());
+        
+        double y;
+        if (enfants.isEmpty()) {
+            // Feuille : nouvelle ligne
+            y = startY + (ligneCourante[0]++) * vSpacing;
+        } else {
+            // Nœud interne : centré sur ses enfants
+            List<Double> yEnfants = new ArrayList<>();
+            for (Courrier enfant : enfants) {
+                double ye = placerFiliation(enfant, profondeur + 1, enfantsDe, parCode,
+                                            startX, startY, hSpacing, vSpacing, ligneCourante);
+                yEnfants.add(ye);
+            }
+            y = (yEnfants.get(0) + yEnfants.get(yEnfants.size() - 1)) / 2.0;
+            
+            // Dessiner les liens vers chaque enfant
+            Color color = courrierColors.getOrDefault(courrier.getId(), Color.web("#2980b9"));
+            for (int i = 0; i < enfants.size(); i++) {
+                Courrier enfant = enfants.get(i);
+                double yEnfant = yEnfants.get(i);
+                long heures = 0;
+                if (courrier.getDateCreation() != null && enfant.getDateCreation() != null) {
+                    heures = Math.max(0, ChronoUnit.HOURS.between(
+                        courrier.getDateCreation(), enfant.getDateCreation()));
+                }
+                drawEventConnection(
+                    x + NODE_WIDTH, y + NODE_HEIGHT / 2,
+                    x + hSpacing, yEnfant + NODE_HEIGHT / 2,
+                    heures, color);
+            }
+        }
+        
+        // Dessiner le nœud du courrier
+        Color color = courrierColors.getOrDefault(courrier.getId(), Color.web("#2980b9"));
+        boolean estParent = !enfants.isEmpty();
+        graphPane.getChildren().add(createCourrierFiliationNode(courrier, x, y, color, estParent, enfants.size()));
+        
+        return y;
+    }
+    
+    /**
+     * Crée un nœud visuel représentant un courrier dans le graphe de filiation.
+     */
+    private VBox createCourrierFiliationNode(Courrier courrier, double x, double y,
+                                             Color color, boolean estParent, int nbEnfants) {
+        VBox node = new VBox(6);
+        node.setLayoutX(x);
+        node.setLayoutY(y);
+        node.setPrefWidth(NODE_WIDTH);
+        node.setMinHeight(NODE_HEIGHT);
+        node.setAlignment(Pos.CENTER_LEFT);
+        node.setPadding(new Insets(10));
+        
+        String colorHex = color != null ? String.format("#%02X%02X%02X",
+            (int) (color.getRed() * 255),
+            (int) (color.getGreen() * 255),
+            (int) (color.getBlue() * 255)) : "#2980b9";
+        
+        node.setStyle(
+            "-fx-background-color: white;" +
+            "-fx-border-color: " + colorHex + ";" +
+            "-fx-border-width: " + (estParent ? 3 : 2) + ";" +
+            "-fx-border-radius: 10;" +
+            "-fx-background-radius: 10;" +
+            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.25), 7, 0, 0, 2);");
+        
+        Label codeLabel = new Label((estParent ? "🌱 " : "📩 ") + courrier.getCodeCourrier());
+        codeLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: " + colorHex + ";");
+        
+        Label objetLabel = new Label(courrier.getObjet() != null ? courrier.getObjet() : "");
+        objetLabel.setWrapText(true);
+        objetLabel.setMaxWidth(NODE_WIDTH - 16);
+        objetLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #34495e;");
+        
+        node.getChildren().addAll(codeLabel, objetLabel);
+        
+        if (estParent) {
+            Label badge = new Label("→ " + nbEnfants + (nbEnfants > 1 ? " courriers générés" : " courrier généré"));
+            badge.setStyle("-fx-font-size: 9px; -fx-text-fill: white; -fx-background-color: " + colorHex + ";"
+                + " -fx-background-radius: 8; -fx-padding: 1 6 1 6;");
+            node.getChildren().add(badge);
+        } else if (courrier.getReference() != null && !courrier.getReference().isBlank()) {
+            Label ref = new Label("issu de " + courrier.getReference());
+            ref.setStyle("-fx-font-size: 9px; -fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+            node.getChildren().add(ref);
+        }
+        
+        Tooltip.install(node, new Tooltip(
+            courrier.getCodeCourrier() + "\n" + (courrier.getObjet() != null ? courrier.getObjet() : "")
+            + (courrier.getReference() != null && !courrier.getReference().isBlank()
+                ? "\nRéférence : " + courrier.getReference() : "")));
+        
+        node.setCursor(Cursor.HAND);
+        node.setOnMouseClicked(e -> {
+            Courrier full = courrierService.getCourrierById(courrier.getId());
+            if (full != null) {
+                Platform.runLater(() ->
+                    new CourrierDetailDialog(full, cotationService, workflowService).show());
+            }
+        });
+        node.setOnMouseEntered(e -> { node.setScaleX(1.05); node.setScaleY(1.05); });
+        node.setOnMouseExited(e -> { node.setScaleX(1.0); node.setScaleY(1.0); });
+        
+        return node;
     }
     
     /**
@@ -1065,8 +1290,10 @@ public class WorkflowSuiviController implements Initializable {
             ));
         }
         
-        // Trier par date
-        evenements.sort(Comparator.comparing(EvenementParcours::getDate));
+        // Trier par date (les événements sans date sont placés en fin, sans NPE)
+        evenements.sort(Comparator.comparing(
+            EvenementParcours::getDate,
+            Comparator.nullsLast(Comparator.naturalOrder())));
         
         return evenements;
     }
@@ -1854,8 +2081,59 @@ public class WorkflowSuiviController implements Initializable {
      * Exporte la visualisation
      */
     private void exporterVisualization() {
-        // À implémenter : export en PDF/PNG
-        AlertUtils.showInfo("Export", "Fonctionnalité à implémenter: export de la visualisation");
+        try {
+            if (graphPane == null || graphPane.getChildren().isEmpty()) {
+                AlertUtils.showWarning("Export impossible",
+                    "Le graphe est vide. Générez d'abord une visualisation.");
+                return;
+            }
+
+            // Dimensions réelles du contenu (indépendantes du zoom courant)
+            double w = Math.ceil(graphPane.getBoundsInLocal().getWidth());
+            double h = Math.ceil(graphPane.getBoundsInLocal().getHeight());
+            if (w <= 0 || h <= 0) {
+                w = graphPane.getMinWidth();
+                h = graphPane.getMinHeight();
+            }
+            // Garde-fou mémoire : borner la surface exportée
+            double maxDim = 6000;
+            double exportScale = 1.0;
+            if (w > maxDim || h > maxDim) {
+                exportScale = Math.min(maxDim / w, maxDim / h);
+            }
+
+            javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+            params.setFill(Color.WHITE);
+            params.setTransform(javafx.scene.transform.Transform.scale(exportScale, exportScale));
+
+            int imgW = (int) Math.ceil(w * exportScale);
+            int imgH = (int) Math.ceil(h * exportScale);
+            javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(imgW, imgH);
+            graphPane.snapshot(params, image);
+
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("Exporter la visualisation (PNG)");
+            chooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter("Image PNG", "*.png"));
+            String modeSuffix = (modeActuel != null) ? modeActuel.name().toLowerCase() : "workflow";
+            chooser.setInitialFileName("workflow_" + modeSuffix + "_" + LocalDate.now() + ".png");
+
+            java.io.File file = chooser.showSaveDialog(
+                graphPane.getScene() != null ? graphPane.getScene().getWindow() : null);
+            if (file == null) return; // annulé par l'utilisateur
+
+            java.awt.image.BufferedImage bImage =
+                javafx.embed.swing.SwingFXUtils.fromFXImage(image, null);
+            javax.imageio.ImageIO.write(bImage, "png", file);
+
+            AlertUtils.showInfo("Export réussi",
+                "Image enregistrée (" + imgW + "×" + imgH + " px) :\n" + file.getAbsolutePath());
+
+        } catch (Exception e) {
+            System.err.println("Erreur export: " + e.getMessage());
+            e.printStackTrace();
+            AlertUtils.showError("Erreur d'export", "Impossible d'exporter la visualisation :\n" + e.getMessage());
+        }
     }
     
     /**
