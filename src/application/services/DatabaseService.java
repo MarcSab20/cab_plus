@@ -21,24 +21,56 @@ public class DatabaseService {
     
     private static DatabaseService instance;
     
-    // Configuration MySQL
-    private static final String DB_HOST = "localhost";
-    private static final String DB_PORT = "3306";
-    private static final String DB_NAME = "document";
-    private static final String DB_USER = "marco";
-    private static final String DB_PASSWORD = "29Papa278."; 
-    
-    // URL JDBC améliorée avec gestion de reconnexion
-    private static final String JDBC_URL = "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME + 
-                                          "?useSSL=false" +
-                                          "&allowPublicKeyRetrieval=true" +
-                                          "&serverTimezone=UTC" +
-                                          "&autoReconnect=true" +           // Reconnexion automatique
-                                          "&maxReconnects=3" +              // Nombre de tentatives
-                                          "&initialTimeout=2" +             // Timeout initial
-                                          "&cachePrepStmts=true" +          // Cache des PreparedStatements
-                                          "&useServerPrepStmts=true" +      // Utiliser PreparedStatements serveur
-                                          "&rewriteBatchedStatements=true"; // Optimisation des batchs
+ // === CHARGEMENT DYNAMIQUE DEPUIS config.properties ===
+    private static final Properties CONFIG = new Properties();
+    private static String JDBC_URL;
+    private static String DB_USER;
+    private static String DB_PASSWORD;
+
+    static {
+        try {
+            // Priorité 1 : config.properties à côté du JAR
+            java.nio.file.Path externe = java.nio.file.Paths.get("config.properties");
+            java.io.InputStream is;
+
+            if (java.nio.file.Files.exists(externe)) {
+                is = new java.io.FileInputStream(externe.toFile());
+                System.out.println("✅ config.properties chargé depuis dossier externe");
+            } else {
+                is = DatabaseService.class.getResourceAsStream("/config.properties");
+                System.out.println("✅ config.properties chargé depuis le JAR");
+            }
+
+            if (is == null) {
+                throw new RuntimeException("❌ config.properties introuvable !");
+            }
+
+            CONFIG.load(new java.io.InputStreamReader(is, "UTF-8"));
+
+            String host = CONFIG.getProperty("db.host", "localhost");
+            String port = CONFIG.getProperty("db.port", "3306");
+            String name = CONFIG.getProperty("db.name", "document");
+            DB_USER     = CONFIG.getProperty("db.user", "marco");
+            DB_PASSWORD = CONFIG.getProperty("db.password", "");
+
+            JDBC_URL = "jdbc:mysql://" + host + ":" + port + "/" + name
+                     + "?useSSL=false"
+                     + "&allowPublicKeyRetrieval=true"
+                     + "&serverTimezone=Africa/Douala"
+                     + "&useUnicode=true"
+                     + "&characterEncoding=UTF-8"
+                     + "&autoReconnect=true"
+                     + "&maxReconnects=5"
+                     + "&cachePrepStmts=true"
+                     + "&useServerPrepStmts=true"
+                     + "&rewriteBatchedStatements=true";
+
+            System.out.println("✅ Connexion configurée → " + host + ":" + port + "/" + name);
+
+        } catch (Exception e) {
+            throw new RuntimeException("❌ Erreur chargement config.properties : " + e.getMessage(), e);
+        }
+    }
     
     // Connexion principale pour l'initialisation
     private Connection mainConnection;
@@ -71,7 +103,7 @@ public class DatabaseService {
             mainConnection.setAutoCommit(true);
             
             System.out.println("✓ Connexion à la base de données MySQL établie");
-            System.out.println("✓ Base de données: " + DB_NAME);
+            System.out.println("✓ Base de données: " + "document");
             System.out.println("✓ Utilisateur: " + DB_USER);
             
             // Création des tables

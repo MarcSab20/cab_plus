@@ -55,14 +55,6 @@
                
                <VBox alignment="CENTER" spacing="10.0" styleClass="card" 
                      style="-fx-background-color: white; -fx-cursor: hand; -fx-padding: 20; -fx-min-width: 150; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);"
-                     onMouseClicked="#handleTableauBord">
-                  <Label style="-fx-font-size: 32px;" text="📊" />
-                  <Label style="-fx-font-weight: bold;" text="Tableau de bord" />
-                  <Label style="-fx-text-fill: #7f8c8d; -fx-font-size: 12px;" text="Voir les statistiques" />
-               </VBox>
-               
-               <VBox alignment="CENTER" spacing="10.0" styleClass="card" 
-                     style="-fx-background-color: white; -fx-cursor: hand; -fx-padding: 20; -fx-min-width: 150; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);"
                      onMouseClicked="#handleGestionCourriers">
                   <Label style="-fx-font-size: 32px;" text="📁" />
                   <Label style="-fx-font-weight: bold;" text="Mes courriers" />

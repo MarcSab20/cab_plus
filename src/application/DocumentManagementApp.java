@@ -16,7 +16,7 @@ import application.utils.DiagnosticUtils;
 public class DocumentManagementApp extends Application {
     
     private static Stage primaryStage;
-    private static final String APP_TITLE = "Système de Gestion Documentaire";
+    private static final String APP_TITLE = "Système de Gestion Du Courrier";
     private static final double WINDOW_WIDTH = 1200;
     private static final double WINDOW_HEIGHT = 800;
     

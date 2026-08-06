@@ -136,15 +136,6 @@ public class AccueilController implements Initializable {
     
     
     /**
-     * Gestion de l'action "Tableau de bord"
-     */
-    @FXML
-    private void handleTableauBord(MouseEvent event) {
-        System.out.println("Action: Tableau de bord");
-        navigateToView("dashboard");
-    }
-    
-    /**
      * Gestion de l'action "Gestion des courriers"
      */
     @FXML

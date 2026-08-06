@@ -11,6 +11,7 @@ import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import application.models.User;
 import application.services.AuthenticationService;
+import application.services.NetworkService;
 import application.utils.SessionManager;
 import application.utils.WorkflowVisualizationHelper;
 import application.utils.AlertUtils;
@@ -132,10 +133,6 @@ public class MainController implements Initializable {
             // Configuration des boutons de navigation
             if (btnAccueil != null) {
                 btnAccueil.setOnAction(e -> loadView("accueil"));
-            }
-            
-            if (btnDashboard != null) {
-                btnDashboard.setOnAction(e -> loadView("dashboard"));
             }
             
             if (btnWorkflowVisualization != null) {
@@ -358,7 +355,7 @@ public class MainController implements Initializable {
     private void updateNavigationButtons(String activeView) {
         try {
             // Réinitialiser tous les boutons
-            Button[] buttons = {btnAccueil, btnDashboard, btnWorkflowDashboard, btnCourrier, btnDocuments, 
+            Button[] buttons = {btnAccueil, btnWorkflowDashboard, btnCourrier, btnDocuments, 
                               btnReunions, btnMessages, btnRecherche, btnParametres, btnAdmin, btnAdminHierarchy};
             
             for (Button btn : buttons) {
@@ -386,7 +383,6 @@ public class MainController implements Initializable {
     private Button getButtonForView(String viewName) {
         switch (viewName.toLowerCase()) {
             case "accueil": return btnAccueil;
-            case "dashboard": return btnDashboard;
             case "workflow_dashboard": return btnWorkflowDashboard;
             case "courrier": return btnCourrier;
             case "documents": return btnDocuments;
@@ -463,7 +459,8 @@ public class MainController implements Initializable {
      * Démarre les tâches en arrière-plan
      */
     private void startBackgroundTasks() {
-        // Mise à jour de l'heure toutes les secondes
+
+        // 1. Mise à jour de l'horloge (chaque seconde)
         Thread timeUpdater = new Thread(() -> {
             while (true) {
                 try {
@@ -476,6 +473,66 @@ public class MainController implements Initializable {
         });
         timeUpdater.setDaemon(true);
         timeUpdater.start();
+
+        // 2. Rafraîchissement automatique toutes les 30 secondes
+        Thread autoRefresh = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(30_000);
+                    Platform.runLater(() -> {
+                        if (currentView != null && !currentView.isEmpty()) {
+                            loadView(currentView);
+                            if (statusLabel != null) {
+                                statusLabel.setText("🔄 Synchronisé à " +
+                                    java.time.LocalDateTime.now().format(
+                                        java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            }
+                        }
+                    });
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        });
+        autoRefresh.setDaemon(true);
+        autoRefresh.start();
+
+        // 3. Écoute des notifications réseau en temps réel
+        try {
+            NetworkService networkService = application.services.NetworkService.getInstance();
+            networkService.initialize();
+            networkService.addWorkflowUpdateListener(
+                new application.services.NetworkService.WorkflowUpdateListener() {
+                    @Override
+                    public void onWorkflowUpdate(int courrierId, String serviceCode) {
+                        Platform.runLater(() -> {
+                            if ("courrier".equals(currentView)) loadView("courrier");
+                            if (statusLabel != null)
+                                statusLabel.setText("📬 Courrier #" + courrierId + " mis à jour");
+                        });
+                    }
+                    @Override
+                    public void onWorkflowComplete(int courrierId) {
+                        Platform.runLater(() -> {
+                            if ("courrier".equals(currentView)) loadView("courrier");
+                            if (statusLabel != null)
+                                statusLabel.setText("✅ Courrier #" + courrierId + " traité");
+                        });
+                    }
+                    @Override
+                    public void onRefreshRequest() {
+                        Platform.runLater(() -> {
+                            if (currentView != null && !currentView.isEmpty()) {
+                                loadView(currentView);
+                            }
+                        });
+                    }
+                }
+            );
+            System.out.println("✅ Écoute réseau démarrée");
+        } catch (Exception e) {
+            System.err.println("⚠️ Impossible de démarrer l'écoute réseau: " + e.getMessage());
+        }
     }
     
     /**
